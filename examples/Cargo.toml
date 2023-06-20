@@ -1,0 +1,13 @@
+[package]
+name = "examples"
+version = "0.1.0"
+publish = false
+edition = "2021"
+authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
+
+[dev-dependencies]
+car-mirror = { path = "../car-mirror", version = "0.1" }
+
+[[example]]
+name = "counterparts"
+path = "counterparts.rs"
