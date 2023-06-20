@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687285800612,
+  "lastUpdate": 1687285871240,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -28,6 +28,36 @@ window.BENCHMARK_DATA = {
           {
             "name": "add",
             "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "appcypher@outlook.com",
+            "name": "Stephen Akinyemi",
+            "username": "appcypher"
+          },
+          "committer": {
+            "email": "appcypher@outlook.com",
+            "name": "Stephen Akinyemi",
+            "username": "appcypher"
+          },
+          "distinct": true,
+          "id": "1f624b5cf0799b0b5c412b44b3a33c2327279243",
+          "message": "No docker",
+          "timestamp": "2023-06-20T19:30:27+01:00",
+          "tree_id": "22dc907a0db7bb05e8682ee2a9fdd7722180473a",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/1f624b5cf0799b0b5c412b44b3a33c2327279243"
+        },
+        "date": 1687285870527,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "add",
+            "value": 1,
             "range": "± 0",
             "unit": "ns/iter"
           }
