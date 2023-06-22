@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687285871240,
+  "lastUpdate": 1687464906944,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -53,6 +53,36 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fission-codes/rs-car-mirror/commit/1f624b5cf0799b0b5c412b44b3a33c2327279243"
         },
         "date": 1687285870527,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "add",
+            "value": 1,
+            "range": "± 0",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "walkah@walkah.net",
+            "name": "James Walker",
+            "username": "walkah"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b4b2fa182303a4626cf79fdef109e9a0c9ecafeb",
+          "message": "Merge pull request #2 from fission-codes/walkah/initial-updates\n\nfix: gitignore, lockfiles, etc",
+          "timestamp": "2023-06-22T16:14:17-04:00",
+          "tree_id": "31fd936ba712e93bf87874870f6a772e8bdf8f1e",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/b4b2fa182303a4626cf79fdef109e9a0c9ecafeb"
+        },
+        "date": 1687464905326,
         "tool": "cargo",
         "benches": [
           {
