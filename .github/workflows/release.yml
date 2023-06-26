@@ -26,7 +26,7 @@ jobs:
       github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     outputs:
-      releases_created: ${{ steps.release.outputs['car-mirror--release_created'] || steps.release.outputs['car-mirror-wasm--release_created'] }}
+      releases_created: ${{ steps.release.outputs['car-mirror--release_created'] || steps.release.outputs['car-mirror-cli--release_created'] }} || steps.release.outputs['car-mirror-wasm--release_created'] }}
       wasm_release_created: ${{ steps.release.outputs['car-mirror-wasm--release_created'] }}
 
     steps:

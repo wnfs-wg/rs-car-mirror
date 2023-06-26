@@ -3,6 +3,7 @@ members = [
 	"examples",
 	"car-mirror",
 	"car-mirror-benches",
+	"car-mirror-cli",
 	"car-mirror-wasm"
 ]
 
