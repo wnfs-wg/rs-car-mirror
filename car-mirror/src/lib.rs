@@ -4,27 +4,85 @@
 
 //! car-mirror
 
+use anyhow::Result;
+use async_stream::try_stream;
+use bytes::Bytes;
+use futures::Stream;
+use libipld::{Ipld, IpldCodec};
+use libipld_core::{cid::Cid, codec::References};
+use std::{
+    collections::{HashSet, VecDeque},
+    io::Cursor,
+};
+use wnfs_common::BlockStore;
+
 /// Test utilities.
 #[cfg(any(test, feature = "test_utils"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
 pub mod test_utils;
 
-/// Add two integers together.
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
+/// walks a DAG from given root breadth-first along IPLD links
+pub fn walk_dag_in_order_breadth_first<'a>(
+    root: Cid,
+    store: &'a impl BlockStore,
+) -> impl Stream<Item = Result<(Cid, Bytes)>> + 'a {
+    try_stream! {
+        let mut visited = HashSet::new();
+        let mut frontier = VecDeque::from([root]);
+        while let Some(cid) = frontier.pop_front() {
+            if visited.contains(&cid) {
+                continue;
+            }
+            visited.insert(cid);
+            let block = store.get_block(&cid).await?;
+            let codec = IpldCodec::try_from(cid.codec())?;
+            frontier.extend(references(codec, &block)?);
+            yield (cid, block);
+        }
+    }
 }
 
-/// Multiplies two integers together.
-pub fn mult(a: i32, b: i32) -> i32 {
-    a * b
+fn references(codec: IpldCodec, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
+    let mut refs = Vec::new();
+    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
+    Ok(refs)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::TryStreamExt;
+    use wnfs_common::MemoryBlockStore;
 
-    #[test]
-    fn test_mult() {
-        assert_eq!(mult(3, 2), 6);
+    #[async_std::test]
+    async fn test_walk_dag_breadth_first() -> Result<()> {
+        let store = &MemoryBlockStore::new();
+
+        let cid_1 = store.put_serializable(&Ipld::String("1".into())).await?;
+        let cid_2 = store.put_serializable(&Ipld::String("2".into())).await?;
+        let cid_3 = store.put_serializable(&Ipld::String("3".into())).await?;
+
+        let cid_1_wrap = store
+            .put_serializable(&Ipld::List(vec![Ipld::Link(cid_1)]))
+            .await?;
+
+        let cid_root = store
+            .put_serializable(&Ipld::List(vec![
+                Ipld::Link(cid_1_wrap),
+                Ipld::Link(cid_2),
+                Ipld::Link(cid_3),
+            ]))
+            .await?;
+
+        let cids = walk_dag_in_order_breadth_first(cid_root, store)
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .map(|(cid, _block)| cid)
+            .collect::<Vec<_>>();
+
+        assert_eq!(cids, vec![cid_root, cid_1_wrap, cid_2, cid_3, cid_1]);
+
+        Ok(())
     }
 }
