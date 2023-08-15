@@ -26,17 +26,21 @@ doc = true
 anyhow = "1.0"
 async-stream = "0.3.5"
 bytes = "1.4.0"
+fixedbitset = "0.4.2"
 futures = "0.3.28"
 libipld = "0.16.0"
 libipld-core = "0.16.0"
 proptest = { version = "1.1", optional = true }
+roaring-graphs = "0.12"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 wnfs-common = "0.1.23"
 
 [dev-dependencies]
-proptest = "1.1"
 async-std = { version = "1.11", features = ["attributes"] }
+car-mirror = { path = ".", features = ["test_utils"] }
+proptest = "1.1"
+test-strategy = "0.3"
 
 [features]
 default = []

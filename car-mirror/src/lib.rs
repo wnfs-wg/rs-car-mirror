@@ -86,3 +86,63 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use crate::{
+        test_utils::{encode, generate_dag},
+        walk_dag_in_order_breadth_first,
+    };
+    use futures::TryStreamExt;
+    use libipld::{
+        multihash::{Code, MultihashDigest},
+        Cid, Ipld, IpldCodec,
+    };
+    use proptest::strategy::Strategy;
+    use std::collections::BTreeSet;
+    use test_strategy::proptest;
+    use wnfs_common::{BlockStore, MemoryBlockStore};
+
+    fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
+        generate_dag(256, |cids| {
+            let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
+            let cid = Cid::new_v1(
+                IpldCodec::DagCbor.into(),
+                Code::Blake3_256.digest(&encode(&ipld)),
+            );
+            (cid, ipld)
+        })
+    }
+
+    #[proptest(max_shrink_iters = 100_000)]
+    fn walk_dag_never_iterates_block_twice(#[strategy(ipld_dags())] dag: (Vec<(Cid, Ipld)>, Cid)) {
+        async_std::task::block_on(async {
+            let (dag, root) = dag;
+            let store = &MemoryBlockStore::new();
+            for (cid, ipld) in dag.iter() {
+                let cid_store = store
+                    .put_block(encode(ipld), IpldCodec::DagCbor.into())
+                    .await
+                    .unwrap();
+                assert_eq!(*cid, cid_store);
+            }
+
+            let mut cids = walk_dag_in_order_breadth_first(root, store)
+                .map_ok(|(cid, _)| cid)
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+
+            cids.sort();
+
+            let unique_cids = cids
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+
+            assert_eq!(cids, unique_cids);
+        });
+    }
+}

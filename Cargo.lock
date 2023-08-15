@@ -308,6 +308,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e2c3daef883ecc1b5d58c15adae93470a91d425f3532ba1695849656af3fc1"
 
 [[package]]
+name = "bytemuck"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17febce684fd15d89027105661fec94afb475cb995fbc59d2865198446ba2eea"
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -330,10 +336,14 @@ dependencies = [
  "async-std",
  "async-stream",
  "bytes",
+ "car-mirror",
+ "fixedbitset",
  "futures",
  "libipld",
  "libipld-core",
  "proptest",
+ "roaring-graphs",
+ "test-strategy",
  "tracing",
  "tracing-subscriber",
  "wnfs-common",
@@ -499,6 +509,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cov-mark"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ffa3d3e0138386cd4361f63537765cac7ee40698028844635a54495a92f67f3"
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -644,6 +660,12 @@ checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
 dependencies = [
  "instant",
 ]
+
+[[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "fnv"
@@ -1324,6 +1346,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "436b050e76ed2903236f032a59761c1eb99e1b0aead2c257922771dab1fc8c78"
 
 [[package]]
+name = "retain_mut"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c31b5c4033f8fdde8700e4657be2c497e7288f01515be52168c631e2e4d4086"
+
+[[package]]
+name = "roaring"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6106b5cf8587f5834158895e9715a3c6c9716c8aefab57f1f7680917191c7873"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "retain_mut",
+]
+
+[[package]]
+name = "roaring-graphs"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff3b6db6a957b3ee92cf83d4a107d37827c4aa7a92ca71a933f0bea83a35d61f"
+dependencies = [
+ "cov-mark",
+ "proptest",
+ "rand",
+ "roaring",
+]
+
+[[package]]
 name = "rustix"
 version = "0.37.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,6 +1526,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "structmeta"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ad9e09554f0456d67a69c1584c9798ba733a5b50349a6c0d0948710523922d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "structmeta-derive",
+ "syn 2.0.27",
+]
+
+[[package]]
+name = "structmeta-derive"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a60bcaff7397072dca0017d1db428e30d5002e00b6847703e2e42005c95fbe00"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.27",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1520,6 +1594,18 @@ dependencies = [
  "redox_syscall",
  "rustix",
  "windows-sys",
+]
+
+[[package]]
+name = "test-strategy"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8361c808554228ad09bfed70f5c823caf8a3450b6881cc3a38eb57e8c08c1d9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "structmeta",
+ "syn 2.0.27",
 ]
 
 [[package]]
