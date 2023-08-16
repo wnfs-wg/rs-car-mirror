@@ -4,7 +4,7 @@
 
 //! car-mirror
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -25,6 +25,9 @@ use wnfs_common::BlockStore;
 #[cfg(any(test, feature = "test_utils"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
 pub mod test_utils;
+
+/// Contains the data types that are sent over-the-wire and relevant serialization code.
+pub mod messages;
 
 /// walks a DAG from given root breadth-first along IPLD links
 pub fn walk_dag_in_order_breadth_first<'a>(
