@@ -4,18 +4,21 @@
 
 //! car-mirror
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use iroh_car::CarWriter;
+use iroh_car::{CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
-use libipld_core::{cid::Cid, codec::References};
+use libipld_core::{
+    cid::Cid,
+    codec::References,
+    multihash::{Code, MultihashDigest},
+};
 use std::{
     collections::{HashSet, VecDeque},
     io::Cursor,
 };
-use tokio::io::AsyncWrite;
 use wnfs_common::BlockStore;
 
 /// Test utilities.
@@ -45,7 +48,7 @@ pub fn walk_dag_in_order_breadth_first<'a>(
 }
 
 /// Writes a stream of blocks into a car file
-pub async fn stream_into_car<W: AsyncWrite + Send + Unpin>(
+pub async fn stream_into_car<W: tokio::io::AsyncWrite + Send + Unpin>(
     mut blocks: impl Stream<Item = Result<(Cid, Bytes)>> + Unpin,
     writer: &mut CarWriter<W>,
 ) -> Result<()> {
@@ -54,6 +57,49 @@ pub async fn stream_into_car<W: AsyncWrite + Send + Unpin>(
         writer.write(cid, bytes).await?;
     }
     Ok(())
+}
+
+/// Read a directed acyclic graph from a CAR file, making sure it's read in-order and
+/// only blocks reachable from the root are included.
+pub fn read_in_order_dag_from_car<'a, R: tokio::io::AsyncRead + Unpin>(
+    root: Cid,
+    reader: &'a mut CarReader<R>,
+) -> impl Stream<Item = Result<(Cid, Bytes)>> + Unpin + 'a {
+    Box::pin(try_stream! {
+        let mut reachable_from_root = HashSet::from([root]);
+        while let Some((cid, vec)) = reader.next_block().await.map_err(|e| anyhow!(e))? {
+            let block = Bytes::from(vec);
+
+            let code: Code = cid
+                .hash()
+                .code()
+                .try_into()
+                .map_err(|_| anyhow!("Unsupported hash code in Cid: {cid}"))?;
+
+            let codec: IpldCodec = cid
+                .codec()
+                .try_into()
+                .map_err(|_| anyhow!("Unsupported codec in Cid: {cid}"))?;
+
+            let digest = code.digest(&block);
+
+            if cid.hash() != &digest {
+                Err(anyhow!(
+                    "Digest mismatch in CAR file: expected {:?}, got {:?}",
+                    digest,
+                    cid.hash()
+                ))?;
+            }
+
+            if !reachable_from_root.contains(&cid) {
+                Err(anyhow!("Unexpected block or block out of order: {cid}"))?;
+            }
+
+            reachable_from_root.extend(references(codec, &block)?);
+
+            yield (cid, block);
+        }
+    })
 }
 
 fn references(codec: IpldCodec, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
@@ -68,10 +114,10 @@ mod tests {
 
     use super::*;
     use async_std::fs::File;
-    use futures::TryStreamExt;
+    use futures::{future, TryStreamExt};
     use iroh_car::CarHeader;
     use libipld_core::multihash::{Code, MultihashDigest};
-    use tokio_util::compat::FuturesAsyncWriteCompatExt;
+    use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
     use wnfs_common::MemoryBlockStore;
 
     #[async_std::test]
@@ -91,12 +137,23 @@ mod tests {
             assert_eq!(*cid, cid_store);
         }
 
-        let file = File::create("./my-car3.car").await?;
+        let filename = "./my-car.car";
+
+        let file = File::create(filename).await?;
         let mut writer = CarWriter::new(CarHeader::new_v1(vec![root]), file.compat_write());
         writer.write_header().await?;
         let block_stream = walk_dag_in_order_breadth_first(root, store);
         stream_into_car(block_stream, &mut writer).await?;
-        let file = writer.finish().await?;
+        writer.finish().await?;
+
+        let mut reader = CarReader::new(File::open(filename).await?.compat()).await?;
+
+        read_in_order_dag_from_car(root, &mut reader)
+            .try_for_each(|(cid, _)| {
+                println!("Got {cid}");
+                future::ready(Ok(()))
+            })
+            .await?;
 
         Ok(())
     }
