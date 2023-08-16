@@ -7,13 +7,15 @@
 use anyhow::Result;
 use async_stream::try_stream;
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, StreamExt};
+use iroh_car::CarWriter;
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
 use std::{
     collections::{HashSet, VecDeque},
     io::Cursor,
 };
+use tokio::io::AsyncWrite;
 use wnfs_common::BlockStore;
 
 /// Test utilities.
@@ -25,8 +27,8 @@ pub mod test_utils;
 pub fn walk_dag_in_order_breadth_first<'a>(
     root: Cid,
     store: &'a impl BlockStore,
-) -> impl Stream<Item = Result<(Cid, Bytes)>> + 'a {
-    try_stream! {
+) -> impl Stream<Item = Result<(Cid, Bytes)>> + Unpin + 'a {
+    Box::pin(try_stream! {
         let mut visited = HashSet::new();
         let mut frontier = VecDeque::from([root]);
         while let Some(cid) = frontier.pop_front() {
@@ -39,7 +41,19 @@ pub fn walk_dag_in_order_breadth_first<'a>(
             frontier.extend(references(codec, &block)?);
             yield (cid, block);
         }
+    })
+}
+
+/// Writes a stream of blocks into a car file
+pub async fn stream_into_car<W: AsyncWrite + Send + Unpin>(
+    mut blocks: impl Stream<Item = Result<(Cid, Bytes)>> + Unpin,
+    writer: &mut CarWriter<W>,
+) -> Result<()> {
+    while let Some(result) = blocks.next().await {
+        let (cid, bytes) = result?;
+        writer.write(cid, bytes).await?;
     }
+    Ok(())
 }
 
 fn references(codec: IpldCodec, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
@@ -50,9 +64,42 @@ fn references(codec: IpldCodec, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::{encode, generate_dag, Rvg};
+
     use super::*;
+    use async_std::fs::File;
     use futures::TryStreamExt;
+    use iroh_car::CarHeader;
+    use libipld_core::multihash::{Code, MultihashDigest};
+    use tokio_util::compat::FuturesAsyncWriteCompatExt;
     use wnfs_common::MemoryBlockStore;
+
+    #[async_std::test]
+    async fn test_write_into_car() -> Result<()> {
+        let (blocks, root) = Rvg::new().sample(&generate_dag(256, |cids| {
+            let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
+            let bytes = encode(&ipld);
+            let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
+            (cid, bytes)
+        }));
+
+        let store = &MemoryBlockStore::new();
+        for (cid, bytes) in blocks.iter() {
+            let cid_store = store
+                .put_block(bytes.clone(), IpldCodec::DagCbor.into())
+                .await?;
+            assert_eq!(*cid, cid_store);
+        }
+
+        let file = File::create("./my-car3.car").await?;
+        let mut writer = CarWriter::new(CarHeader::new_v1(vec![root]), file.compat_write());
+        writer.write_header().await?;
+        let block_stream = walk_dag_in_order_breadth_first(root, store);
+        stream_into_car(block_stream, &mut writer).await?;
+        let file = writer.finish().await?;
+
+        Ok(())
+    }
 
     #[async_std::test]
     async fn test_walk_dag_breadth_first() -> Result<()> {
