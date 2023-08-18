@@ -58,3 +58,9 @@ pub struct PushResponse {
     #[serde(rename = "bb")]
     pub bloom: Vec<u8>,
 }
+
+impl PushResponse {
+    pub fn indicates_finished(&self) -> bool {
+        self.subgraph_roots.is_empty()
+    }
+}
