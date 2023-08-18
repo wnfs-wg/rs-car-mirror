@@ -1,17 +1,8 @@
 use std::{collections::HashSet, fmt::Debug};
 
-use bytes::Bytes;
-use libipld::{Cid, Ipld, IpldCodec};
-use libipld_core::codec::Encode;
+use libipld::Cid;
 use proptest::{strategy::Strategy, test_runner::TestRng};
 use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
-
-/// Encode some IPLD as dag-cbor
-pub fn encode(ipld: &Ipld) -> Bytes {
-    let mut vec = Vec::new();
-    ipld.encode(IpldCodec::DagCbor, &mut vec).unwrap(); // TODO(matheus23) unwrap
-    Bytes::from(vec)
-}
 
 /// A strategy for use with proptest to generate random DAGs (directed acyclic graphs).
 /// The strategy generates a list of blocks of type T and their CIDs, as well as

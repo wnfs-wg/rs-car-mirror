@@ -191,10 +191,10 @@ pub async fn server_push_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{encode, generate_dag, Rvg};
+    use crate::test_utils::{encode, generate_dag, get_cid_at_approx_path, Rvg};
     use libipld::{Ipld, IpldCodec};
     use libipld_core::multihash::{Code, MultihashDigest};
-    use proptest::prelude::Rng;
+    use proptest::{collection::vec, prelude::Rng};
     use std::collections::BTreeMap;
     use wnfs_common::MemoryBlockStore;
 
@@ -303,6 +303,31 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_deduplicating_transfer() -> Result<()> {
+        const BLOCK_PADDING: usize = 10 * 1024;
+        let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
+        let total_bytes = total_dag_bytes(root, client_store).await?;
+        let path = Rvg::new().sample(&vec(0usize..128, 0..64));
+        let second_root = get_cid_at_approx_path(path, root, client_store).await?;
+
+        let server_store = &MemoryBlockStore::new();
+        let config = &PushConfig::default();
+        let metrics1 = simulate_protocol(second_root, config, client_store, server_store).await?;
+        let metrics2 = simulate_protocol(root, config, client_store, server_store).await?;
+
+        let total_network_bytes = metrics1
+            .into_iter()
+            .chain(metrics2.into_iter())
+            .map(|metric| metric.request_bytes + metric.response_bytes)
+            .sum::<usize>();
+
+        println!("Total DAG bytes: {total_bytes}");
+        println!("Total network bytes: {total_network_bytes}");
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn print_metrics() -> Result<()> {
         const TESTS: usize = 200;
         const DAG_SIZE: u16 = 256;
@@ -342,4 +367,9 @@ mod tests {
 
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
 }
