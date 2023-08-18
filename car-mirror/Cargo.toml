@@ -26,6 +26,7 @@ doc = true
 anyhow = "1.0"
 async-stream = "0.3.5"
 bytes = "1.4.0"
+deterministic-bloom = { git = "https://github.com/wnfs-wg/deterministic-bloom#a8cd85b" }
 fixedbitset = "0.4.2"
 futures = "0.3.28"
 iroh-car = "0.3.0"

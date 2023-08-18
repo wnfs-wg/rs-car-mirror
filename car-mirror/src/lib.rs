@@ -6,6 +6,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use bytes::Bytes;
+use deterministic_bloom::runtime_size::BloomFilter;
 use futures::{stream::try_unfold, Stream, StreamExt, TryStreamExt};
 use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
@@ -30,6 +31,7 @@ pub struct PushConfig {
     send_minimum: usize,
     receive_maximum: usize,
     max_roots_per_round: usize,
+    bloom_fpr: f64,
 }
 
 impl Default for PushConfig {
@@ -38,6 +40,7 @@ impl Default for PushConfig {
             send_minimum: 128 * 1024,    // 128KiB
             receive_maximum: 512 * 1024, // 512KiB
             max_roots_per_round: 1000,   // max. ~41KB of CIDs
+            bloom_fpr: 1.0 / 1_000.0,    // 0.1%
         }
     }
 }
@@ -53,23 +56,33 @@ pub async fn client_initiate_push(
         bloom_k: 3,
         bloom: Vec::new(),
     };
-    client_push(root, &fake_response, config, store).await
+    client_push(root, fake_response, config, store).await
 }
 
 pub async fn client_push(
     root: Cid,
-    last_response: &PushResponse,
+    last_response: PushResponse,
     config: &PushConfig,
     store: &impl BlockStore,
 ) -> Result<Bytes> {
+    let PushResponse {
+        ref subgraph_roots,
+        bloom_k,
+        bloom,
+    } = last_response;
+
     // Verify that all subgraph roots are in the relevant DAG:
     let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
         .stream(store)
-        .try_filter_map(|(cid, _)| async move {
-            Ok(last_response.subgraph_roots.contains(&cid).then_some(cid))
-        })
+        .try_filter_map(|(cid, _)| async move { Ok(subgraph_roots.contains(&cid).then_some(cid)) })
         .try_collect()
         .await?;
+
+    let bloom = if bloom.is_empty() {
+        BloomFilter::new_with(1, Box::new([0])) // An empty bloom that contains nothing
+    } else {
+        BloomFilter::new_with(bloom_k as usize, bloom.into_boxed_slice())
+    };
 
     let mut writer = CarWriter::new(
         CarHeader::new_v1(
@@ -88,8 +101,21 @@ pub async fn client_push(
     writer.write_header().await?;
 
     let mut block_bytes = 0;
-    let mut dag_walk = DagWalk::breadth_first(subgraph_roots);
+    let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
     while let Some((cid, block)) = dag_walk.next(store).await? {
+        if bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(&cid) {
+            // TODO(matheus23) I think the spec means to prune the whole subgraph.
+            // But
+            // 1. That requires the receiver to check the whole subgraph at that CID to find out whether there's a missing block at the subgraph.
+            // 2. It requires the sender to go through every block under this subgraph down to the leaves to mark all of these CIDs as visited.
+            // Both of these are *huge* traversals. I'd say likely not worth it. The only case I can image they're worth it, is if the DAG
+            // is *heavily* using structural sharing and not tree-like.
+            // Also: This fails completely if the sender is just missing a single leaf. It couldn't add the block to the bloom in that case.
+            dag_walk.skip_walking((cid, block))?;
+            println!("Skipped walking {cid} due to bloom");
+            break;
+        }
+
         writer.write(cid, &block).await?;
         println!("Sending {cid}");
 
@@ -138,11 +164,19 @@ pub async fn server_push_response(
         .cloned()
         .collect();
 
+    let mut bloom =
+        BloomFilter::new_from_fpr_po2(dag_verification.have_cids.len() as u64, config.bloom_fpr);
+
+    dag_verification
+        .have_cids
+        .iter()
+        .for_each(|cid| bloom.insert(&cid.to_bytes()));
+
     Ok(PushResponse {
         subgraph_roots,
         // We ignore blooms for now
-        bloom_k: 3,
-        bloom: Vec::new(),
+        bloom_k: bloom.hash_count() as u32,
+        bloom: bloom.as_bytes().to_vec(),
     })
 }
 
@@ -190,8 +224,7 @@ impl DagWalk {
         };
 
         let block = store.get_block(&cid).await?;
-        let codec = IpldCodec::try_from(cid.codec())?;
-        for ref_cid in references(codec, &block)? {
+        for ref_cid in references(cid, &block)? {
             if !self.visited.contains(&ref_cid) {
                 self.frontier.push_back(ref_cid);
             }
@@ -218,6 +251,16 @@ impl DagWalk {
             .frontier
             .iter()
             .any(|frontier_cid| !self.visited.contains(frontier_cid))
+    }
+
+    pub fn skip_walking(&mut self, block: (Cid, Bytes)) -> Result<()> {
+        let (cid, bytes) = block;
+        let refs = references(cid, bytes)?;
+        self.visited.insert(cid);
+        self.frontier
+            .retain(|frontier_cid| !refs.contains(frontier_cid));
+
+        Ok(())
     }
 }
 
@@ -280,11 +323,6 @@ impl IncrementalDagVerification {
     ) -> Result<()> {
         let (cid, bytes) = block;
 
-        let codec: IpldCodec = cid
-            .codec()
-            .try_into()
-            .map_err(|_| anyhow!("Unsupported codec in Cid: {cid}"))?;
-
         if !self.want_cids.contains(&cid) {
             if self.have_cids.contains(&cid) {
                 eprintln!("Warn: Received {cid}, even though we already have it");
@@ -293,8 +331,8 @@ impl IncrementalDagVerification {
             }
         }
 
-        let refs = references(codec, &bytes)?;
-        let result_cid = store.put_block(bytes, codec.into()).await?;
+        let refs = references(cid, &bytes)?;
+        let result_cid = store.put_block(bytes, cid.codec()).await?;
 
         if result_cid != cid {
             bail!("Digest mismatch in CAR file: expected {cid}, got {result_cid}");
@@ -313,7 +351,12 @@ impl IncrementalDagVerification {
     }
 }
 
-fn references(codec: IpldCodec, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
+fn references(cid: Cid, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
+    let codec: IpldCodec = cid
+        .codec()
+        .try_into()
+        .map_err(|_| anyhow!("Unsupported codec in Cid: {cid}"))?;
+
     let mut refs = Vec::new();
     <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
     Ok(refs)
@@ -357,11 +400,15 @@ mod tests {
         loop {
             println!("Sending request {} bytes", request.len());
             let response = server_push_response(root, request, config, receiver_store).await?;
-            println!("Response: {:?}", response.subgraph_roots);
+            println!(
+                "Response (bloom bytes: {}): {:?}",
+                response.bloom.len(),
+                response.subgraph_roots,
+            );
             if response.indicates_finished() {
                 break;
             }
-            request = client_push(root, &response, config, sender_store).await?;
+            request = client_push(root, response, config, sender_store).await?;
         }
 
         // receiver should have all data
