@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/fission-codes/rs-car-mirror" target="_blank">
-    <img src="https://raw.githubusercontent.com/fission-codes/rs-car-mirror/main/assets/a_logo.png" alt="car-mirror Logo" width="100"></img>
+    <img src="https://raw.githubusercontent.com/fission-codes/rs-car-mirror/main/assets/logo.png" alt="car-mirror Logo" width="100"></img>
   </a>
 
   <h1 align="center">car-mirror-wasm</h1>

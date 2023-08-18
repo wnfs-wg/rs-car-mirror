@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/fission-codes/rs-car-mirror" target="_blank">
-    <img src="https://raw.githubusercontent.com/fission-codes/rs-car-mirror/main/assets/a_logo.png" alt="car-mirror Logo" width="100"></img>
+    <img src="https://raw.githubusercontent.com/fission-codes/rs-car-mirror/main/assets/logo.png" alt="car-mirror Logo" width="100"></img>
   </a>
 
   <h1 align="center">car-mirror</h1>
@@ -36,6 +36,8 @@
 <div align="center"><sub>:warning: Work in progress :warning:</sub></div>
 
 ##
+
+Car Mirror is a synchronization protocol for directed acyclic graphs (DAGs) which uses Bloom filters to efficiently share information about a graph under synchronization between two parties.
 
 ## Outline
 
@@ -102,7 +104,7 @@ generated values.
   cargo bench -p car-mirror-benches
   ```
 
-*Note*: Currently, this workspace only supports Rust-native benchmarking, as
+_Note_: Currently, this workspace only supports Rust-native benchmarking, as
 `wasm-bindgen` support for criterion is still [an open issue][criterion-bindgen].
 However, with some extra work, benchmarks can be compiled to [wasi][wasi] and
 run with [wasmer][wasmer]/[wasmtime][wasmtime] or in the brower with
@@ -157,7 +159,7 @@ hooks. Please run this before every commit and/or push.
 
 ### Conventional Commits
 
-This project *lightly* follows the [Conventional Commits
+This project _lightly_ follows the [Conventional Commits
 convention][commit-spec-site] to help explain
 commit history and tie in with our release process. The full specification
 can be found [here][commit-spec]. We recommend prefixing your commits with
@@ -197,7 +199,6 @@ submitted for inclusion in the work by you, as defined in the Apache-2.0
 license, shall be dual licensed as above, without any additional terms or
 conditions.
 
-
 [apache]: https://www.apache.org/licenses/LICENSE-2.0
 [cargo-expand]: https://github.com/dtolnay/cargo-expand
 [cargo-udeps]: https://github.com/est31/cargo-udeps
@@ -207,10 +208,10 @@ conditions.
 [criterion]: https://github.com/bheisler/criterion.rs
 [criterion-bindgen]: https://github.com/bheisler/criterion.rs/issues/270
 [criterion-user-guide]: https://github.com/bheisler/criterion.rs/blob/version-0.4/book/src/user_guide/wasi.md
-[direnv]:https://direnv.net/
+[direnv]: https://direnv.net/
 [irust]: https://github.com/sigmaSd/IRust
 [mit]: http://opensource.org/licenses/MIT
-[nix]:https://nixos.org/download.html
+[nix]: https://nixos.org/download.html
 [nix-flake]: https://nixos.wiki/wiki/Flakes
 [node-js]: https://nodejs.dev/en/
 [pre-commit]: https://pre-commit.com/
