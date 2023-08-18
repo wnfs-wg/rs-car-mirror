@@ -23,7 +23,7 @@ pub struct PushConfig {
     /// and that the client will consume.
     pub max_roots_per_round: usize,
     /// The target false positive rate for the bloom filter that the server sends.
-    pub bloom_fpr: f64,
+    pub bloom_fpr: fn(u64) -> f64,
 }
 
 impl Default for PushConfig {
@@ -32,7 +32,7 @@ impl Default for PushConfig {
             send_minimum: 128 * 1024,    // 128KiB
             receive_maximum: 512 * 1024, // 512KiB
             max_roots_per_round: 1000,   // max. ~41KB of CIDs
-            bloom_fpr: 1.0 / 10_000.0,   // 0.1%
+            bloom_fpr: |num_of_elems| 0.1 / num_of_elems as f64,
         }
     }
 }
@@ -171,8 +171,10 @@ pub async fn server_push_response(
         .cloned()
         .collect();
 
+    let bloom_capacity = dag_verification.have_cids.len() as u64;
+
     let mut bloom =
-        BloomFilter::new_from_fpr_po2(dag_verification.have_cids.len() as u64, config.bloom_fpr);
+        BloomFilter::new_from_fpr_po2(bloom_capacity, (config.bloom_fpr)(bloom_capacity));
 
     dag_verification
         .have_cids
