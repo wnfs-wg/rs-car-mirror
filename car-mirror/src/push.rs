@@ -192,15 +192,25 @@ mod tests {
     use crate::test_utils::{encode, generate_dag, Rvg};
     use libipld::{Ipld, IpldCodec};
     use libipld_core::multihash::{Code, MultihashDigest};
+    use proptest::prelude::Rng;
     use std::collections::BTreeMap;
     use wnfs_common::MemoryBlockStore;
+
+    #[derive(Clone, Debug)]
+    struct Metrics {
+        request_bytes: usize,
+        response_bytes: usize,
+    }
 
     async fn setup_random_dag<const BLOCK_PADDING: usize>(
         dag_size: u16,
     ) -> Result<(Cid, MemoryBlockStore)> {
-        let (blocks, root) = Rvg::new().sample(&generate_dag(dag_size, |cids| {
+        let (blocks, root) = Rvg::new().sample(&generate_dag(dag_size, |cids, rng| {
             let ipld = Ipld::Map(BTreeMap::from([
-                ("data".into(), Ipld::Bytes(vec![0u8; BLOCK_PADDING])),
+                (
+                    "data".into(),
+                    Ipld::Bytes((0..BLOCK_PADDING).map(|_| rng.gen::<u8>()).collect()),
+                ),
                 (
                     "links".into(),
                     Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
@@ -220,63 +230,112 @@ mod tests {
         Ok((root, store))
     }
 
-    #[async_std::test]
-    async fn test_transfer() -> Result<()> {
-        const BLOCK_PADDING: usize = 10 * 1024;
-        let (root, ref sender_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
-        let receiver_store = &MemoryBlockStore::new();
-        let config = &PushConfig::default();
-        let mut request = client_initiate_push(root, config, sender_store).await?;
+    async fn simulate_protocol(
+        root: Cid,
+        config: &PushConfig,
+        client_store: &MemoryBlockStore,
+        server_store: &MemoryBlockStore,
+    ) -> Result<Vec<Metrics>> {
+        let mut metrics = Vec::new();
+        let mut request = client_initiate_push(root, config, client_store).await?;
         loop {
-            let response = server_push_response(root, request, config, receiver_store).await?;
+            let request_bytes = request.len();
+            let response = server_push_response(root, request, config, server_store).await?;
+            let response_bytes = serde_ipld_dagcbor::to_vec(&response)?.len();
+
+            metrics.push(Metrics {
+                request_bytes,
+                response_bytes,
+            });
+
             if response.indicates_finished() {
                 break;
             }
-            request = client_push(root, response, config, sender_store).await?;
+            request = client_push(root, response, config, client_store).await?;
         }
 
+        Ok(metrics)
+    }
+
+    async fn total_dag_bytes(root: Cid, store: &impl BlockStore) -> Result<usize> {
+        Ok(DagWalk::breadth_first([root])
+            .stream(store)
+            .map_ok(|(_, block)| block.len())
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .sum::<usize>())
+    }
+
+    async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Result<usize> {
+        Ok(DagWalk::breadth_first([root])
+            .stream(store)
+            .map_ok(|(_, block)| block.len())
+            .try_collect::<Vec<_>>()
+            .await?
+            .len())
+    }
+
+    #[async_std::test]
+    async fn test_transfer() -> Result<()> {
+        const BLOCK_PADDING: usize = 10 * 1024;
+        let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
+        let server_store = &MemoryBlockStore::new();
+        simulate_protocol(root, &PushConfig::default(), client_store, server_store).await?;
+
         // receiver should have all data
-        let sender_cids = DagWalk::breadth_first([root])
-            .stream(sender_store)
+        let client_cids = DagWalk::breadth_first([root])
+            .stream(client_store)
             .map_ok(|(cid, _)| cid)
             .try_collect::<Vec<_>>()
             .await?;
-        let receiver_cids = DagWalk::breadth_first([root])
-            .stream(receiver_store)
+        let server_cids = DagWalk::breadth_first([root])
+            .stream(server_store)
             .map_ok(|(cid, _)| cid)
             .try_collect::<Vec<_>>()
             .await?;
 
-        assert_eq!(sender_cids, receiver_cids);
+        assert_eq!(client_cids, server_cids);
 
         Ok(())
     }
 
     #[async_std::test]
-    async fn print_average_number_of_rounds() -> Result<()> {
+    async fn print_metrics() -> Result<()> {
         const TESTS: usize = 200;
         const DAG_SIZE: u16 = 256;
         const BLOCK_PADDING: usize = 10 * 1024;
 
         let mut total_rounds = 0;
+        let mut total_blocks = 0;
+        let mut total_block_bytes = 0;
+        let mut total_network_bytes = 0;
         for _ in 0..TESTS {
-            let (root, ref sender_store) = setup_random_dag::<BLOCK_PADDING>(DAG_SIZE).await?;
-            let receiver_store = &MemoryBlockStore::new();
-            let config = &PushConfig::default();
-            let mut request = client_initiate_push(root, config, sender_store).await?;
-            loop {
-                let response = server_push_response(root, request, config, receiver_store).await?;
-                total_rounds += 1;
-                if response.indicates_finished() {
-                    break;
-                }
-                request = client_push(root, response, config, sender_store).await?;
-            }
+            let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(DAG_SIZE).await?;
+            let server_store = &MemoryBlockStore::new();
+            let metrics =
+                simulate_protocol(root, &PushConfig::default(), client_store, server_store).await?;
+
+            total_rounds += metrics.len();
+            total_blocks += total_dag_blocks(root, client_store).await?;
+            total_block_bytes += total_dag_bytes(root, client_store).await?;
+            total_network_bytes += metrics
+                .iter()
+                .map(|metric| metric.request_bytes + metric.response_bytes)
+                .sum::<usize>();
         }
 
         println!(
             "Average # of rounds: {}",
             total_rounds as f64 / TESTS as f64
+        );
+        println!(
+            "Average # of blocks: {}",
+            total_blocks as f64 / TESTS as f64
+        );
+        println!(
+            "Average network overhead: {}%",
+            (total_network_bytes as f64 / total_block_bytes as f64 - 1.0) * 100.0
         );
 
         Ok(())
