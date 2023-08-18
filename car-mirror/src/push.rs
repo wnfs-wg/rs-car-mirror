@@ -116,13 +116,10 @@ pub async fn client_push(
             // Both of these are *huge* traversals. I'd say likely not worth it. The only case I can image they're worth it, is if the DAG
             // is *heavily* using structural sharing and not tree-like.
             // Also: This fails completely if the sender is just missing a single leaf. It couldn't add the block to the bloom in that case.
-            dag_walk.skip_walking((cid, block))?;
-            println!("Skipped walking {cid} due to bloom");
             break;
         }
 
         writer.write(cid, &block).await?;
-        println!("Sending {cid}");
 
         // TODO(matheus23): Count the actual bytes sent?
         block_bytes += block.len();
@@ -153,7 +150,6 @@ pub async fn server_push_response(
 
     while let Some((cid, vec)) = reader.next_block().await? {
         let block = Bytes::from(vec);
-        println!("Received {cid}");
 
         block_bytes += block.len();
         if block_bytes > config.receive_maximum {
@@ -185,7 +181,6 @@ pub async fn server_push_response(
 
     Ok(PushResponse {
         subgraph_roots,
-        // We ignore blooms for now
         bloom_k: bloom.hash_count() as u32,
         bloom: bloom.as_bytes().to_vec(),
     })
@@ -200,11 +195,12 @@ mod tests {
     use std::collections::BTreeMap;
     use wnfs_common::MemoryBlockStore;
 
-    #[async_std::test]
-    async fn test_transfer() -> Result<()> {
-        let (blocks, root) = Rvg::new().sample(&generate_dag(256, |cids| {
+    async fn setup_random_dag<const BLOCK_PADDING: usize>(
+        dag_size: u16,
+    ) -> Result<(Cid, MemoryBlockStore)> {
+        let (blocks, root) = Rvg::new().sample(&generate_dag(dag_size, |cids| {
             let ipld = Ipld::Map(BTreeMap::from([
-                ("data".into(), Ipld::Bytes(vec![0u8; 10 * 1024])),
+                ("data".into(), Ipld::Bytes(vec![0u8; BLOCK_PADDING])),
                 (
                     "links".into(),
                     Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
@@ -215,25 +211,24 @@ mod tests {
             (cid, bytes)
         }));
 
-        let sender_store = &MemoryBlockStore::new();
-        for (cid, bytes) in blocks.iter() {
-            let cid_store = sender_store
-                .put_block(bytes.clone(), IpldCodec::DagCbor.into())
-                .await?;
-            assert_eq!(*cid, cid_store);
+        let store = MemoryBlockStore::new();
+        for (cid, bytes) in blocks.into_iter() {
+            let cid_store = store.put_block(bytes, IpldCodec::DagCbor.into()).await?;
+            assert_eq!(cid, cid_store);
         }
 
+        Ok((root, store))
+    }
+
+    #[async_std::test]
+    async fn test_transfer() -> Result<()> {
+        const BLOCK_PADDING: usize = 10 * 1024;
+        let (root, ref sender_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
         let receiver_store = &MemoryBlockStore::new();
         let config = &PushConfig::default();
         let mut request = client_initiate_push(root, config, sender_store).await?;
         loop {
-            println!("Sending request {} bytes", request.len());
             let response = server_push_response(root, request, config, receiver_store).await?;
-            println!(
-                "Response (bloom bytes: {}): {:?}",
-                response.bloom.len(),
-                response.subgraph_roots,
-            );
             if response.indicates_finished() {
                 break;
             }
@@ -253,6 +248,36 @@ mod tests {
             .await?;
 
         assert_eq!(sender_cids, receiver_cids);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn print_average_number_of_rounds() -> Result<()> {
+        const TESTS: usize = 200;
+        const DAG_SIZE: u16 = 256;
+        const BLOCK_PADDING: usize = 10 * 1024;
+
+        let mut total_rounds = 0;
+        for _ in 0..TESTS {
+            let (root, ref sender_store) = setup_random_dag::<BLOCK_PADDING>(DAG_SIZE).await?;
+            let receiver_store = &MemoryBlockStore::new();
+            let config = &PushConfig::default();
+            let mut request = client_initiate_push(root, config, sender_store).await?;
+            loop {
+                let response = server_push_response(root, request, config, receiver_store).await?;
+                total_rounds += 1;
+                if response.indicates_finished() {
+                    break;
+                }
+                request = client_push(root, response, config, sender_store).await?;
+            }
+        }
+
+        println!(
+            "Average # of rounds: {}",
+            total_rounds as f64 / TESTS as f64
+        );
 
         Ok(())
     }

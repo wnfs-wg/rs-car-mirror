@@ -23,7 +23,9 @@ pub fn generate_dag<T: Debug + Clone>(
     arb_dag(1..max_nodes, 0.5).prop_map(move |dag| dag_to_nodes(&dag, generate_block))
 }
 
-fn dag_to_nodes<T>(
+/// Turn a directed acyclic graph into a list of nodes (with their CID) and a root CID.
+/// This will select only the DAG that's reachable from the root.
+pub fn dag_to_nodes<T>(
     dag: &DirectedAcyclicGraph,
     generate_node: fn(Vec<Cid>) -> (Cid, T),
 ) -> (Vec<(Cid, T)>, Cid) {

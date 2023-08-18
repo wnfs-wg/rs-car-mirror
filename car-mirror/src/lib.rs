@@ -4,21 +4,6 @@
 
 //! car-mirror
 
-use anyhow::{anyhow, bail, Result};
-use bytes::Bytes;
-use deterministic_bloom::runtime_size::BloomFilter;
-use futures::{stream::try_unfold, Stream, StreamExt, TryStreamExt};
-use iroh_car::{CarHeader, CarReader, CarWriter};
-use libipld::{Ipld, IpldCodec};
-use libipld_core::{cid::Cid, codec::References};
-use messages::PushResponse;
-use std::{
-    collections::{HashSet, VecDeque},
-    eprintln,
-    io::Cursor,
-};
-use wnfs_common::{BlockStore, BlockStoreError};
-
 /// Test utilities.
 #[cfg(any(test, feature = "test_utils"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
