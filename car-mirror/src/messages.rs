@@ -60,6 +60,7 @@ pub struct PushResponse {
 }
 
 impl PushResponse {
+    /// Whether this response indicates that the protocol is finished.
     pub fn indicates_finished(&self) -> bool {
         self.subgraph_roots.is_empty()
     }

@@ -6,12 +6,16 @@ use libipld_core::codec::Encode;
 use proptest::strategy::Strategy;
 use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
 
+/// Encode some IPLD as dag-cbor
 pub fn encode(ipld: &Ipld) -> Bytes {
     let mut vec = Vec::new();
     ipld.encode(IpldCodec::DagCbor, &mut vec).unwrap(); // TODO(matheus23) unwrap
     Bytes::from(vec)
 }
 
+/// A strategy for use with proptest to generate random DAGs (directed acyclic graphs).
+/// The strategy generates a list of blocks of type T and their CIDs, as well as
+/// the root block's CID.
 pub fn generate_dag<T: Debug + Clone>(
     max_nodes: u16,
     generate_block: fn(Vec<Cid>) -> (Cid, T),
@@ -19,7 +23,7 @@ pub fn generate_dag<T: Debug + Clone>(
     arb_dag(1..max_nodes, 0.5).prop_map(move |dag| dag_to_nodes(&dag, generate_block))
 }
 
-pub fn dag_to_nodes<T>(
+fn dag_to_nodes<T>(
     dag: &DirectedAcyclicGraph,
     generate_node: fn(Vec<Cid>) -> (Cid, T),
 ) -> (Vec<(Cid, T)>, Cid) {
@@ -30,7 +34,7 @@ pub fn dag_to_nodes<T>(
     (blocks, cid)
 }
 
-pub fn dag_to_nodes_helper<T>(
+fn dag_to_nodes_helper<T>(
     dag: &DirectedAcyclicGraph,
     root: Vertex,
     generate_node: fn(Vec<Cid>) -> (Cid, T),
