@@ -72,6 +72,9 @@ impl DagWalk {
             }
         };
 
+        // TODO: Two opportunities for performance improvement:
+        // - skip Raw CIDs. They can't have further links (but needs adjustment to this function's return type)
+        // - run multiple `get_block` calls concurrently
         let block = store.get_block(&cid).await?;
         for ref_cid in references(cid, &block)? {
             if !self.visited.contains(&ref_cid) {
