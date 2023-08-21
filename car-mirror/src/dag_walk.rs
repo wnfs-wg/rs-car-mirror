@@ -174,7 +174,7 @@ mod proptests {
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
-        generate_dag(256, |cids, _| {
+        generate_dag(256, &|cids, _| {
             let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
             let cid = Cid::new_v1(
                 IpldCodec::DagCbor.into(),

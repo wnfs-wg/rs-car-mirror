@@ -89,8 +89,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_transfer() -> Result<()> {
-        const BLOCK_PADDING: usize = 10 * 1024;
-        let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
+        let (root, ref client_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
         let server_store = &MemoryBlockStore::new();
         simulate_protocol(root, &Config::default(), client_store, server_store).await?;
 
@@ -113,8 +112,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_deduplicating_transfer() -> Result<()> {
-        const BLOCK_PADDING: usize = 10 * 1024;
-        let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
+        let (root, ref client_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
         let total_bytes = total_dag_bytes(root, client_store).await?;
         let path = Rvg::new().sample(&vec(0usize..128, 0..64));
         let second_root = get_cid_at_approx_path(path, root, client_store).await?;
@@ -147,7 +145,7 @@ mod tests {
         let mut total_block_bytes = 0;
         let mut total_network_bytes = 0;
         for _ in 0..TESTS {
-            let (root, ref client_store) = setup_random_dag::<BLOCK_PADDING>(DAG_SIZE).await?;
+            let (root, ref client_store) = setup_random_dag(DAG_SIZE, BLOCK_PADDING).await?;
             let server_store = &MemoryBlockStore::new();
             let metrics =
                 simulate_protocol(root, &Config::default(), client_store, server_store).await?;

@@ -56,15 +56,18 @@ pub(crate) async fn get_cid_at_approx_path(
     Ok(working_cid)
 }
 
-pub(crate) async fn setup_random_dag<const BLOCK_PADDING: usize>(
+pub(crate) async fn setup_random_dag(
     dag_size: u16,
+    block_padding: usize,
 ) -> Result<(Cid, MemoryBlockStore)> {
-    let (blocks, root) = Rvg::new().sample(&generate_dag(dag_size, |cids, rng| {
+    let (blocks, root) = Rvg::new().sample(&generate_dag(dag_size, &|cids, rng| {
+        let mut padding = Vec::with_capacity(block_padding);
+        for _ in 0..block_padding {
+            padding.push(rng.gen::<u8>());
+        }
+
         let ipld = Ipld::Map(BTreeMap::from([
-            (
-                "data".into(),
-                Ipld::Bytes((0..BLOCK_PADDING).map(|_| rng.gen::<u8>()).collect()),
-            ),
+            ("data".into(), Ipld::Bytes(padding)),
             (
                 "links".into(),
                 Ipld::List(cids.into_iter().map(Ipld::Link).collect()),

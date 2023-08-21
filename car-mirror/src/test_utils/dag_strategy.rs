@@ -9,8 +9,8 @@ use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
 /// the root block's CID.
 pub fn generate_dag<T: Debug + Clone>(
     max_nodes: u16,
-    generate_block: fn(Vec<Cid>, rng: &mut TestRng) -> (Cid, T),
-) -> impl Strategy<Value = (Vec<(Cid, T)>, Cid)> {
+    generate_block: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
+) -> impl Strategy<Value = (Vec<(Cid, T)>, Cid)> + '_ {
     arb_dag(1..max_nodes, 0.5)
         .prop_perturb(move |dag, mut rng| dag_to_nodes(&dag, &mut rng, generate_block))
 }
@@ -20,7 +20,7 @@ pub fn generate_dag<T: Debug + Clone>(
 pub fn dag_to_nodes<T>(
     dag: &DirectedAcyclicGraph,
     rng: &mut TestRng,
-    generate_node: fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
+    generate_node: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
 ) -> (Vec<(Cid, T)>, Cid) {
     let mut blocks = Vec::new();
     let mut visited = HashSet::new();
@@ -33,7 +33,7 @@ fn dag_to_nodes_helper<T>(
     dag: &DirectedAcyclicGraph,
     root: Vertex,
     rng: &mut TestRng,
-    generate_node: fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
+    generate_node: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
     arr: &mut Vec<(Cid, T)>,
     visited: &mut HashSet<Vertex>,
 ) -> (Cid, T) {

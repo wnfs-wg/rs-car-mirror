@@ -68,9 +68,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_transfer() -> Result<()> {
-        const BLOCK_PADDING: usize = 10 * 1024; // 10KiB
         let client_store = &MemoryBlockStore::new();
-        let (root, ref server_store) = setup_random_dag::<BLOCK_PADDING>(256).await?;
+        let (root, ref server_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
 
         simulate_protocol(root, &Config::default(), client_store, server_store).await?;
 
