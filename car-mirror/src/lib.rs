@@ -4,7 +4,7 @@
 
 //! car-mirror
 
-/// Test utilities.
+/// Test utilities. Enabled with the `test_utils` feature flag.
 #[cfg(any(test, feature = "test_utils"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
 pub mod test_utils;
