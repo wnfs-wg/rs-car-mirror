@@ -17,5 +17,7 @@ pub mod dag_walk;
 pub mod incremental_verification;
 /// Data types that are sent over-the-wire and relevant serialization code.
 pub mod messages;
-/// The CAR mirror push protocol
+/// The CAR mirror pull protocol. Meant to be used qualified, i.e. `pull::request` and `pull::response`
+pub mod pull;
+/// The CAR mirror push protocol. Meant to be used qualified, i.e. `push::request` and `push::response`
 pub mod push;

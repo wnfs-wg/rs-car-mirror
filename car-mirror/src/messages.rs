@@ -65,3 +65,10 @@ impl PushResponse {
         self.subgraph_roots.is_empty()
     }
 }
+
+impl PullRequest {
+    /// Whether you need to actually send the request or not. If true, this indicates that the protocol is finished.
+    pub fn indicates_finished(&self) -> bool {
+        self.resources.is_empty()
+    }
+}
