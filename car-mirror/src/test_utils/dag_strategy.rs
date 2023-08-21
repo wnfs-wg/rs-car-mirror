@@ -9,10 +9,10 @@ use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
 /// the root block's CID.
 pub fn generate_dag<T: Debug + Clone>(
     max_nodes: u16,
-    generate_block: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
-) -> impl Strategy<Value = (Vec<(Cid, T)>, Cid)> + '_ {
+    generate_block: impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T) + Clone,
+) -> impl Strategy<Value = (Vec<(Cid, T)>, Cid)> {
     arb_dag(1..max_nodes, 0.5)
-        .prop_perturb(move |dag, mut rng| dag_to_nodes(&dag, &mut rng, generate_block))
+        .prop_perturb(move |dag, mut rng| dag_to_nodes(&dag, &mut rng, generate_block.clone()))
 }
 
 /// Turn a directed acyclic graph into a list of nodes (with their CID) and a root CID.
@@ -20,7 +20,7 @@ pub fn generate_dag<T: Debug + Clone>(
 pub fn dag_to_nodes<T>(
     dag: &DirectedAcyclicGraph,
     rng: &mut TestRng,
-    generate_node: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
+    generate_node: impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T) + Clone,
 ) -> (Vec<(Cid, T)>, Cid) {
     let mut blocks = Vec::new();
     let mut visited = HashSet::new();
@@ -33,11 +33,14 @@ fn dag_to_nodes_helper<T>(
     dag: &DirectedAcyclicGraph,
     root: Vertex,
     rng: &mut TestRng,
-    generate_node: &impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T),
+    generate_node: impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, T) + Clone,
     arr: &mut Vec<(Cid, T)>,
     visited: &mut HashSet<Vertex>,
 ) -> (Cid, T) {
     let mut child_blocks = Vec::new();
+    if root >= dag.get_vertex_count() {
+        println!("{root}, {}", dag.get_vertex_count());
+    }
     for child in dag.iter_children(root) {
         if visited.contains(&child) {
             continue;
@@ -47,7 +50,7 @@ fn dag_to_nodes_helper<T>(
             dag,
             child,
             rng,
-            generate_node,
+            generate_node.clone(),
             arr,
             visited,
         ));

@@ -6,6 +6,17 @@ use anyhow::Result;
 use libipld::Cid;
 use wnfs_common::BlockStore;
 
+/// Create a CAR mirror pull request.
+///
+/// If this is the first request that's sent for this
+/// particular root CID, then set `last_response` to `None`.
+///
+/// On subsequent requests, set `last_response` to the
+/// last successfully received response.
+///
+/// Before actually sending the request over the network,
+/// make sure to check the `request.indicates_finished()`.
+/// If true, the client already has all data.
 pub async fn request(
     root: Cid,
     last_response: Option<CarFile>,
@@ -14,16 +25,17 @@ pub async fn request(
 ) -> Result<PullRequest> {
     Ok(block_receive(root, last_response, config, store)
         .await?
-        .into_pull_request())
+        .into())
 }
 
+/// Respond to a CAR mirror pull request.
 pub async fn response(
     root: Cid,
     request: PullRequest,
     config: &Config,
     store: &impl BlockStore,
 ) -> Result<CarFile> {
-    let receiver_state = Some(ReceiverState::from_pull_request(request));
+    let receiver_state = Some(ReceiverState::from(request));
     block_send(root, receiver_state, config, store).await
 }
 
@@ -39,7 +51,7 @@ mod tests {
     use libipld::Cid;
     use wnfs_common::MemoryBlockStore;
 
-    async fn simulate_protocol(
+    pub(crate) async fn simulate_protocol(
         root: Cid,
         config: &Config,
         client_store: &MemoryBlockStore,
@@ -88,5 +100,52 @@ mod tests {
         assert_eq!(client_cids, server_cids);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use crate::{
+        common::Config,
+        dag_walk::DagWalk,
+        test_utils::{setup_blockstore, variable_blocksize_dag},
+    };
+    use futures::TryStreamExt;
+    use libipld::{Cid, Ipld};
+    use test_strategy::proptest;
+    use wnfs_common::MemoryBlockStore;
+
+    #[proptest]
+    fn cold_transfer_completes(#[strategy(variable_blocksize_dag())] dag: (Vec<(Cid, Ipld)>, Cid)) {
+        let (blocks, root) = dag;
+        async_std::task::block_on(async {
+            let server_store = &setup_blockstore(blocks).await.unwrap();
+            let client_store = &MemoryBlockStore::new();
+
+            crate::pull::tests::simulate_protocol(
+                root,
+                &Config::default(),
+                client_store,
+                server_store,
+            )
+            .await
+            .unwrap();
+
+            // client should have all data
+            let client_cids = DagWalk::breadth_first([root])
+                .stream(client_store)
+                .map_ok(|(cid, _)| cid)
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+            let server_cids = DagWalk::breadth_first([root])
+                .stream(server_store)
+                .map_ok(|(cid, _)| cid)
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+
+            assert_eq!(client_cids, server_cids);
+        })
     }
 }

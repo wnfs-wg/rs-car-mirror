@@ -6,33 +6,34 @@ use anyhow::Result;
 use libipld_core::cid::Cid;
 use wnfs_common::BlockStore;
 
-/// TODO(matheus23) update docs
+/// Create a CAR mirror push request.
 ///
-/// Send a subsequent car mirror push request, following up on
-/// a response retrieved from an initial `client_initiate_push` request.
+/// On the first request for a particular `root`, set
+/// `last_response` to `None`.
 ///
-/// Make sure to call `response.indicates_finished()` before initiating
-/// a follow-up `client_push` request.
+/// For subsequent requests, set it to the last successful
+/// response from a request with the same `root`.
 ///
-/// The return value is another CAR file with more blocks from the DAG below the root.
+/// The returned request body is a CAR file from some of the first
+/// blocks below the root.
 pub async fn request(
     root: Cid,
     last_response: Option<PushResponse>,
     config: &Config,
     store: &impl BlockStore,
 ) -> Result<CarFile> {
-    let receiver_state = last_response.map(ReceiverState::from_push_response);
+    let receiver_state = last_response.map(ReceiverState::from);
     block_send(root, receiver_state, config, store).await
 }
 
-/// TODO(matheus23) update docs
+/// Create a response for a CAR mirror push request.
 ///
-/// This handles a car mirror push request on the server side.
+/// This takes in the CAR file from the request body and stores its blocks
+/// in the given `store`, if the blocks can be shown to relate
+/// to the `root` CID.
 ///
-/// The root is the root CID of the DAG that is pushed, the request is a CAR file
-/// with some blocks from the cold call.
-///
-/// Returns a response to answer the client's request with.
+/// Returnes a response that gives the client information about what
+/// other data remains to be fetched.
 pub async fn response(
     root: Cid,
     request: CarFile,
@@ -41,7 +42,7 @@ pub async fn response(
 ) -> Result<PushResponse> {
     Ok(block_receive(root, Some(request), config, store)
         .await?
-        .into_push_response())
+        .into())
 }
 
 #[cfg(test)]
@@ -60,7 +61,7 @@ mod tests {
     use proptest::collection::vec;
     use wnfs_common::MemoryBlockStore;
 
-    async fn simulate_protocol(
+    pub(crate) async fn simulate_protocol(
         root: Cid,
         config: &Config,
         client_store: &MemoryBlockStore,
@@ -178,5 +179,47 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use super::*;
+    use crate::{
+        common::Config,
+        dag_walk::DagWalk,
+        test_utils::{setup_blockstore, variable_blocksize_dag},
+    };
+    use futures::TryStreamExt;
+    use libipld::{Cid, Ipld};
+    use test_strategy::proptest;
+    use wnfs_common::MemoryBlockStore;
+
+    #[proptest]
+    fn cold_transfer_completes(#[strategy(variable_blocksize_dag())] dag: (Vec<(Cid, Ipld)>, Cid)) {
+        let (blocks, root) = dag;
+        async_std::task::block_on(async {
+            let client_store = &setup_blockstore(blocks).await.unwrap();
+            let server_store = &MemoryBlockStore::new();
+
+            crate::push::tests::simulate_protocol(
+                root,
+                &Config::default(),
+                client_store,
+                server_store,
+            )
+            .await
+            .unwrap();
+
+            // client should have all data
+            let client_cids = DagWalk::breadth_first([root])
+                .stream(client_store)
+                .map_ok(|(cid, _)| cid)
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+            let server_cids = DagWalk::breadth_first([root])
+                .stream(server_store)
+                .map_ok(|(cid, _)| cid)
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+
+            assert_eq!(client_cids, server_cids);
+        })
+    }
 }
