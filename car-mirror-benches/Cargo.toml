@@ -6,14 +6,21 @@ edition = "2021"
 authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
 
 [dependencies]
-car-mirror = { path = "../car-mirror", version = "0.1", features = ["test_utils"] }
-wnfs-common = "0.1.23"
-async-std = { version = "1.11", features = ["attributes"] }
 anyhow = "1.0"
+async-std = { version = "1.11", features = ["attributes"] }
+async-trait = "0.1"
+bytes = "1.4.0"
+car-mirror = { path = "../car-mirror", version = "0.1", features = ["test_utils"] }
+libipld = "0.16.0"
+wnfs-common = "0.1.23"
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false }
 
 [[bench]]
 name = "in_memory"
+harness = false
+
+[[bench]]
+name = "artificially_slow_blockstore"
 harness = false

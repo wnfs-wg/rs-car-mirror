@@ -405,8 +405,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-trait",
+ "bytes",
  "car-mirror",
  "criterion",
+ "libipld",
  "wnfs-common",
 ]
 

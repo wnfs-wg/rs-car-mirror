@@ -8,6 +8,16 @@ use wnfs_common::{BlockStore, MemoryBlockStore};
 /// MemoryBlockStore & return it.
 pub async fn setup_blockstore(blocks: Vec<(Cid, Ipld)>) -> Result<MemoryBlockStore> {
     let store = MemoryBlockStore::new();
+    setup_existing_blockstore(blocks, &store).await?;
+    Ok(store)
+}
+
+/// Take a list of dag-cbor IPLD blocks and store all of them as dag-cbor in
+/// the given `BlockStore`.
+pub async fn setup_existing_blockstore(
+    blocks: Vec<(Cid, Ipld)>,
+    store: &impl BlockStore,
+) -> Result<()> {
     for (cid, ipld) in blocks.into_iter() {
         let cid_store = store
             .put_block(encode(&ipld), IpldCodec::DagCbor.into())
@@ -15,7 +25,7 @@ pub async fn setup_blockstore(blocks: Vec<(Cid, Ipld)>) -> Result<MemoryBlockSto
         debug_assert_eq!(cid, cid_store);
     }
 
-    Ok(store)
+    Ok(())
 }
 
 /// Encode some IPLD as dag-cbor.
