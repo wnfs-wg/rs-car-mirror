@@ -670,7 +670,8 @@ dependencies = [
 [[package]]
 name = "deterministic-bloom"
 version = "0.1.0"
-source = "git+https://github.com/wnfs-wg/deterministic-bloom#a8cd85b#a8cd85b1d71da9f79f5058c0a20e53a83a283230"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12a3873e91e360aee2403cbafd2beb42f02ace06da9b053574518f003aa2490d"
 dependencies = [
  "bitvec",
  "miette",
