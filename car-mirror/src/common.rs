@@ -243,14 +243,14 @@ impl From<PullRequest> for ReceiverState {
     }
 }
 
-impl Into<PushResponse> for ReceiverState {
-    fn into(self) -> PushResponse {
+impl From<ReceiverState> for PushResponse {
+    fn from(receiver_state: ReceiverState) -> PushResponse {
         let ReceiverState {
             missing_subgraph_roots,
             have_cids_bloom,
-        } = self;
+        } = receiver_state;
 
-        let (bloom_k, bloom) = Self::bloom_serialize(have_cids_bloom);
+        let (bloom_k, bloom) = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PushResponse {
             subgraph_roots: missing_subgraph_roots,
@@ -260,14 +260,14 @@ impl Into<PushResponse> for ReceiverState {
     }
 }
 
-impl Into<PullRequest> for ReceiverState {
-    fn into(self) -> PullRequest {
+impl From<ReceiverState> for PullRequest {
+    fn from(receiver_state: ReceiverState) -> PullRequest {
         let ReceiverState {
             missing_subgraph_roots,
             have_cids_bloom,
-        } = self;
+        } = receiver_state;
 
-        let (bloom_k, bloom) = Self::bloom_serialize(have_cids_bloom);
+        let (bloom_k, bloom) = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PullRequest {
             resources: missing_subgraph_roots,
