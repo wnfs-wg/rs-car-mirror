@@ -86,7 +86,7 @@ pub async fn block_send(
         .try_collect()
         .await?;
 
-    let bloom = have_cids_bloom.unwrap_or(BloomFilter::new_with(1, Box::new([0]))); // An empty bloom that contains nothing
+    let bloom = have_cids_bloom.unwrap_or_else(|| BloomFilter::new_with(1, Box::new([0]))); // An empty bloom that contains nothing
 
     let mut writer = CarWriter::new(
         CarHeader::new_v1(
