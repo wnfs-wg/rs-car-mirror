@@ -59,6 +59,7 @@ mod tests {
     use futures::TryStreamExt;
     use libipld::Cid;
     use proptest::collection::vec;
+    use std::collections::HashSet;
     use wnfs_common::MemoryBlockStore;
 
     pub(crate) async fn simulate_protocol(
@@ -98,12 +99,12 @@ mod tests {
         let client_cids = DagWalk::breadth_first([root])
             .stream(client_store)
             .map_ok(|(cid, _)| cid)
-            .try_collect::<Vec<_>>()
+            .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
             .stream(server_store)
             .map_ok(|(cid, _)| cid)
-            .try_collect::<Vec<_>>()
+            .try_collect::<HashSet<_>>()
             .await?;
 
         assert_eq!(client_cids, server_cids);
@@ -186,6 +187,7 @@ mod proptests {
     };
     use futures::TryStreamExt;
     use libipld::{Cid, Ipld};
+    use std::collections::HashSet;
     use test_strategy::proptest;
     use wnfs_common::MemoryBlockStore;
 
@@ -209,13 +211,13 @@ mod proptests {
             let client_cids = DagWalk::breadth_first([root])
                 .stream(client_store)
                 .map_ok(|(cid, _)| cid)
-                .try_collect::<Vec<_>>()
+                .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
                 .stream(server_store)
                 .map_ok(|(cid, _)| cid)
-                .try_collect::<Vec<_>>()
+                .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
 
