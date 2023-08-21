@@ -403,8 +403,11 @@ dependencies = [
 name = "car-mirror-benches"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-std",
  "car-mirror",
  "criterion",
+ "wnfs-common",
 ]
 
 [[package]]

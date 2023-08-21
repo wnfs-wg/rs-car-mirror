@@ -1,16 +1,10 @@
 ///! Crate-local test utilities
-use super::{generate_dag, Rvg};
+use super::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore, Rvg};
 use crate::{common::references, dag_walk::DagWalk};
 use anyhow::Result;
-use bytes::Bytes;
 use futures::TryStreamExt;
-use libipld::{Cid, Ipld, IpldCodec};
-use libipld_core::{
-    codec::Encode,
-    multihash::{Code, MultihashDigest},
-};
-use proptest::{prelude::Rng, strategy::Strategy};
-use std::collections::BTreeMap;
+use libipld::{Cid, Ipld};
+use proptest::strategy::Strategy;
 use wnfs_common::{BlockStore, MemoryBlockStore};
 
 #[derive(Clone, Debug)]
@@ -44,23 +38,7 @@ pub(crate) fn padded_dag_strategy(
     dag_size: u16,
     block_padding: usize,
 ) -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
-    generate_dag(dag_size, move |cids, rng| {
-        let mut padding = Vec::with_capacity(block_padding);
-        for _ in 0..block_padding {
-            padding.push(rng.gen::<u8>());
-        }
-
-        let ipld = Ipld::Map(BTreeMap::from([
-            ("data".into(), Ipld::Bytes(padding)),
-            (
-                "links".into(),
-                Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
-            ),
-        ]));
-        let bytes = encode(&ipld);
-        let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
-        (cid, ipld)
-    })
+    arb_ipld_dag(1..dag_size, 0.5, links_to_padded_ipld(block_padding))
 }
 
 pub(crate) fn variable_blocksize_dag() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
@@ -76,20 +54,9 @@ pub(crate) fn variable_blocksize_dag() -> impl Strategy<Value = (Vec<(Cid, Ipld)
     const MAX_BLOCK_SIZE: usize = 256 * 1024;
     const MAX_BLOCK_PADDING: usize = MAX_BLOCK_SIZE - EST_OVERHEAD - MAX_LINK_BYTES;
 
-    (32..MAX_BLOCK_PADDING)
-        .prop_ind_flat_map(move |block_padding| padded_dag_strategy(MAX_DAG_NODES, block_padding))
-}
-
-pub(crate) async fn setup_blockstore(blocks: Vec<(Cid, Ipld)>) -> Result<MemoryBlockStore> {
-    let store = MemoryBlockStore::new();
-    for (cid, ipld) in blocks.into_iter() {
-        let cid_store = store
-            .put_block(encode(&ipld), IpldCodec::DagCbor.into())
-            .await?;
-        debug_assert_eq!(cid, cid_store);
-    }
-
-    Ok(store)
+    (32..MAX_BLOCK_PADDING).prop_ind_flat_map(move |block_padding| {
+        arb_ipld_dag(1..MAX_DAG_NODES, 0.5, links_to_padded_ipld(block_padding))
+    })
 }
 
 pub(crate) async fn setup_random_dag(
@@ -118,11 +85,4 @@ pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Resu
         .try_collect::<Vec<_>>()
         .await?
         .len())
-}
-
-/// Encode some IPLD as dag-cbor
-pub(crate) fn encode(ipld: &Ipld) -> Bytes {
-    let mut vec = Vec::new();
-    ipld.encode(IpldCodec::DagCbor, &mut vec).unwrap();
-    Bytes::from(vec)
 }

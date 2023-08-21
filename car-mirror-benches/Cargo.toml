@@ -7,10 +7,13 @@ authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
 
 [dependencies]
 car-mirror = { path = "../car-mirror", version = "0.1", features = ["test_utils"] }
+wnfs-common = "0.1.23"
+async-std = { version = "1.11", features = ["attributes"] }
+anyhow = "1.0"
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false }
 
 [[bench]]
-name = "a_benchmark"
+name = "in_memory"
 harness = false

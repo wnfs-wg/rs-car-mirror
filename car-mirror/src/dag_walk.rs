@@ -162,7 +162,7 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::test_utils::{encode, generate_dag};
+    use crate::test_utils::{arb_ipld_dag, encode};
     use futures::TryStreamExt;
     use libipld::{
         multihash::{Code, MultihashDigest},
@@ -174,7 +174,7 @@ mod proptests {
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
-        generate_dag(256, |cids, _| {
+        arb_ipld_dag(1..256, 0.5, |cids, _| {
             let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
             let cid = Cid::new_v1(
                 IpldCodec::DagCbor.into(),
