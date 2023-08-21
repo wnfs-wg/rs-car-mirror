@@ -109,13 +109,6 @@ pub async fn client_push(
     let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
     while let Some((cid, block)) = dag_walk.next(store).await? {
         if bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(&cid) {
-            // TODO(matheus23) I think the spec means to prune the whole subgraph.
-            // But
-            // 1. That requires the receiver to check the whole subgraph at that CID to find out whether there's a missing block at the subgraph.
-            // 2. It requires the sender to go through every block under this subgraph down to the leaves to mark all of these CIDs as visited.
-            // Both of these are *huge* traversals. I'd say likely not worth it. The only case I can image they're worth it, is if the DAG
-            // is *heavily* using structural sharing and not tree-like.
-            // Also: This fails completely if the sender is just missing a single leaf. It couldn't add the block to the bloom in that case.
             break;
         }
 
