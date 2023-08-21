@@ -1,10 +1,10 @@
 [workspace]
 members = [
-	"examples",
 	"car-mirror",
 	"car-mirror-benches",
 	"car-mirror-wasm"
-]
+,
+	"examples"]
 
 # See https://doc.rust-lang.org/cargo/reference/profiles.html for more info.
 [profile.release.package.car-mirror-wasm]
