@@ -10,7 +10,7 @@ use wnfs_common::BlockStore;
 
 use crate::{
     dag_walk::DagWalk,
-    incremental_verification::IncrementalDagVerification,
+    incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{PullRequest, PushResponse},
 };
 
@@ -108,7 +108,7 @@ pub async fn block_send(
     let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
     while let Some((cid, block)) = dag_walk.next(store).await? {
         if bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(&cid) {
-            break;
+            continue;
         }
 
         writer.write(cid, &block).await?;
@@ -157,9 +157,18 @@ pub async fn block_receive(
                 );
             }
 
-            dag_verification
-                .verify_and_store_block((cid, block), store)
-                .await?;
+            match dag_verification.block_state(cid) {
+                BlockState::Have => continue,
+                BlockState::Unexpected => {
+                    eprintln!("Warn: Received block {cid} out of order, may be due to bloom false positive.");
+                    break;
+                }
+                BlockState::Want => {
+                    dag_verification
+                        .verify_and_store_block((cid, block), store)
+                        .await?;
+                }
+            }
         }
     }
 

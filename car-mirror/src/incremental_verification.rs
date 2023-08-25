@@ -1,8 +1,8 @@
-use crate::{common::references, dag_walk::DagWalk};
+use crate::dag_walk::DagWalk;
 use anyhow::{bail, Result};
 use bytes::Bytes;
 use libipld_core::cid::Cid;
-use std::{collections::HashSet, eprintln};
+use std::{collections::HashSet, matches};
 use wnfs_common::{BlockStore, BlockStoreError};
 
 /// A data structure that keeps state about incremental DAG verification.
@@ -14,6 +14,17 @@ pub struct IncrementalDagVerification {
     pub have_cids: HashSet<Cid>,
 }
 
+/// The state of a block retrieval
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BlockState {
+    /// The block was already received/is already stored
+    Have,
+    /// We know we will need this block
+    Want,
+    /// We don't know whether we'll need this block
+    Unexpected,
+}
+
 impl IncrementalDagVerification {
     /// Initiate incremental DAG verification of given roots.
     ///
@@ -23,9 +34,18 @@ impl IncrementalDagVerification {
         roots: impl IntoIterator<Item = Cid>,
         store: &impl BlockStore,
     ) -> Result<Self> {
-        let mut want_cids = HashSet::new();
-        let mut have_cids = HashSet::new();
-        let mut dag_walk = DagWalk::breadth_first(roots);
+        let mut this = Self {
+            want_cids: roots.into_iter().collect(),
+            have_cids: HashSet::new(),
+        };
+
+        this.update_have_cids(store).await?;
+
+        Ok(this)
+    }
+
+    async fn update_have_cids(&mut self, store: &impl BlockStore) -> Result<()> {
+        let mut dag_walk = DagWalk::breadth_first(self.want_cids.iter().cloned());
 
         loop {
             match dag_walk.next(store).await {
@@ -33,13 +53,14 @@ impl IncrementalDagVerification {
                     if let Some(BlockStoreError::CIDNotFound(not_found)) =
                         e.downcast_ref::<BlockStoreError>()
                     {
-                        want_cids.insert(*not_found);
+                        self.want_cids.insert(*not_found);
                     } else {
                         bail!(e);
                     }
                 }
                 Ok(Some((cid, _))) => {
-                    have_cids.insert(cid);
+                    self.want_cids.remove(&cid);
+                    self.have_cids.insert(cid);
                 }
                 Ok(None) => {
                     break;
@@ -47,15 +68,27 @@ impl IncrementalDagVerification {
             }
         }
 
-        Ok(Self {
-            want_cids,
-            have_cids,
-        })
+        Ok(())
+    }
+
+    /// Check the state of a CID to find out whether
+    /// - we expect it as one of the next possible blocks to receive (Want)
+    /// - we have already stored it (Have)
+    /// - we don't know whether we need it (Unexpected)
+    pub fn block_state(&self, cid: Cid) -> BlockState {
+        if self.want_cids.contains(&cid) {
+            BlockState::Want
+        } else if self.have_cids.contains(&cid) {
+            BlockState::Have
+        } else {
+            BlockState::Unexpected
+        }
     }
 
     /// Verify that
-    /// - the block actually hashes to the hash from given CID and
     /// - the block is part of the graph below the roots.
+    /// - the block hasn't been received before
+    /// - the block actually hashes to the hash from given CID and
     ///
     /// And finally stores the block in the blockstore.
     ///
@@ -71,29 +104,21 @@ impl IncrementalDagVerification {
     ) -> Result<()> {
         let (cid, bytes) = block;
 
-        if !self.want_cids.contains(&cid) {
-            if self.have_cids.contains(&cid) {
-                eprintln!("Warn: Received {cid}, even though we already have it");
-            } else {
-                bail!("Unexpected block or block out of order: {cid}");
-            }
+        let block_state = self.block_state(cid);
+        if !matches!(block_state, BlockState::Want) {
+            bail!("Incremental verification failed. Block state is: {block_state:?}, expected BlockState::Want");
         }
 
-        let refs = references(cid, &bytes)?;
+        // TODO(matheus23): Verify hash before putting it into the blockstore.
         let result_cid = store.put_block(bytes, cid.codec()).await?;
 
+        // TODO(matheus23): The BlockStore chooses the hashing function,
+        // so it may choose a different hashing function, causing a mismatch
         if result_cid != cid {
             bail!("Digest mismatch in CAR file: expected {cid}, got {result_cid}");
         }
 
-        for ref_cid in refs {
-            if !self.have_cids.contains(&ref_cid) {
-                self.want_cids.insert(ref_cid);
-            }
-        }
-
-        self.want_cids.remove(&cid);
-        self.have_cids.insert(cid);
+        self.update_have_cids(store).await?;
 
         Ok(())
     }

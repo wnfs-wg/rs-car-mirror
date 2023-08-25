@@ -1,8 +1,9 @@
+use crate::common::references;
 use anyhow::Result;
 use bytes::Bytes;
 use libipld::{Cid, Ipld, IpldCodec};
-use libipld_core::codec::Encode;
-use wnfs_common::{BlockStore, MemoryBlockStore};
+use std::io::Write;
+use wnfs_common::{dagcbor::encode, BlockStore, MemoryBlockStore};
 
 /// Take a list of dag-cbor IPLD blocks and store all of them as dag-cbor in a
 /// MemoryBlockStore & return it.
@@ -19,18 +20,45 @@ pub async fn setup_existing_blockstore(
     store: &impl BlockStore,
 ) -> Result<()> {
     for (cid, ipld) in blocks.into_iter() {
-        let cid_store = store
-            .put_block(encode(&ipld), IpldCodec::DagCbor.into())
-            .await?;
+        let block: Bytes = encode(&ipld)?.into();
+        let cid_store = store.put_block(block, IpldCodec::DagCbor.into()).await?;
         debug_assert_eq!(cid, cid_store);
     }
 
     Ok(())
 }
 
-/// Encode some IPLD as dag-cbor.
-pub fn encode(ipld: &Ipld) -> Bytes {
-    let mut vec = Vec::new();
-    ipld.encode(IpldCodec::DagCbor, &mut vec).unwrap();
-    Bytes::from(vec)
+/// Print a DAG as a dot file with truncated CIDs
+pub fn dag_to_dot(
+    writer: &mut impl Write,
+    blocks: impl IntoIterator<Item = (Cid, Ipld)>,
+) -> Result<()> {
+    writeln!(writer, "digraph {{")?;
+
+    for (cid, ipld) in blocks {
+        let bytes = encode(&ipld)?;
+        let refs = references(cid, &bytes)?;
+        for to_cid in refs {
+            print_truncated_string(writer, cid.to_string())?;
+            write!(writer, " -> ")?;
+            print_truncated_string(writer, to_cid.to_string())?;
+            writeln!(writer)?;
+        }
+    }
+
+    writeln!(writer, "}}")?;
+
+    Ok(())
+}
+
+fn print_truncated_string(writer: &mut impl Write, mut string: String) -> Result<()> {
+    if string.len() > 20 {
+        let mut string_rest = string.split_off(10);
+        let string_end = string_rest.split_off(std::cmp::max(string_rest.len(), 10) - 10);
+        write!(writer, "\"{string}...{string_end}\"")?;
+    } else {
+        write!(writer, "\"{string}\"")?;
+    }
+
+    Ok(())
 }

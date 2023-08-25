@@ -1,4 +1,3 @@
-use super::encode;
 use bytes::Bytes;
 use libipld::{Cid, Ipld, IpldCodec};
 use libipld_core::multihash::{Code, MultihashDigest};
@@ -9,6 +8,7 @@ use std::{
     fmt::Debug,
     ops::Range,
 };
+use wnfs_common::dagcbor::encode;
 
 /// A strategy for use with proptest to generate random DAGs (directed acyclic graphs).
 /// The strategy generates a list of blocks of type T and their CIDs, as well as
@@ -25,17 +25,15 @@ pub fn arb_ipld_dag<T: Debug + Clone>(
 /// A block-generating function for use with `arb_ipld_dag`.
 pub fn links_to_ipld(cids: Vec<Cid>, _: &mut TestRng) -> (Cid, Ipld) {
     let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
-    let cid = Cid::new_v1(
-        IpldCodec::DagCbor.into(),
-        Code::Blake3_256.digest(&encode(&ipld)),
-    );
+    let bytes = encode(&ipld).unwrap();
+    let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
     (cid, ipld)
 }
 
 /// A block-generating function for use with `arb_ipld_dag`.
 pub fn links_to_dag_cbor(cids: Vec<Cid>, _: &mut TestRng) -> (Cid, Bytes) {
     let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
-    let bytes = encode(&ipld);
+    let bytes: Bytes = encode(&ipld).unwrap().into();
     let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
     (cid, bytes)
 }
@@ -60,7 +58,7 @@ pub fn links_to_padded_ipld(
                 Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
             ),
         ]));
-        let bytes = encode(&ipld);
+        let bytes = encode(&ipld).unwrap();
         let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
         (cid, ipld)
     }

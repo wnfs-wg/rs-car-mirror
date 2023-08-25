@@ -382,7 +382,6 @@ dependencies = [
  "bytes",
  "car-mirror",
  "deterministic-bloom",
- "fixedbitset",
  "futures",
  "iroh-car",
  "libipld",
@@ -392,8 +391,6 @@ dependencies = [
  "serde",
  "serde_ipld_dagcbor",
  "test-strategy",
- "tokio",
- "tokio-util",
  "tracing",
  "tracing-subscriber",
  "wnfs-common",
@@ -740,12 +737,6 @@ checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
 dependencies = [
  "instant",
 ]
-
-[[package]]
-name = "fixedbitset"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "fnv"
@@ -1848,20 +1839,6 @@ dependencies = [
  "backtrace",
  "bytes",
  "pin-project-lite",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "806fe8c2c87eccc8b3267cbae29ed3ab2d0bd37fca70ab622e46aaa9375ddb7d"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-io",
- "futures-sink",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]
