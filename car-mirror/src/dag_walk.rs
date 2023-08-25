@@ -76,7 +76,7 @@ impl DagWalk {
         // - skip Raw CIDs. They can't have further links (but needs adjustment to this function's return type)
         // - run multiple `get_block` calls concurrently
         let block = store.get_block(&cid).await?;
-        for ref_cid in references(cid, &block, HashSet::new())? {
+        for ref_cid in references(cid, &block, Vec::new())? {
             if !self.visited.contains(&ref_cid) {
                 self.frontier.push_front(ref_cid);
             }
@@ -131,6 +131,10 @@ mod tests {
     #[async_std::test]
     async fn test_walk_dag_breadth_first() -> Result<()> {
         let store = &MemoryBlockStore::new();
+
+        // cid_root ---> cid_1_wrap ---> cid_1
+        //            -> cid_2
+        //            -> cid_3
 
         let cid_1 = store.put_serializable(&Ipld::String("1".into())).await?;
         let cid_2 = store.put_serializable(&Ipld::String("2".into())).await?;
