@@ -1,7 +1,10 @@
 use crate::dag_walk::DagWalk;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use bytes::Bytes;
-use libipld_core::cid::Cid;
+use libipld_core::{
+    cid::Cid,
+    multihash::{Code, MultihashDigest},
+};
 use std::{collections::HashSet, matches};
 use wnfs_common::{BlockStore, BlockStoreError};
 
@@ -109,13 +112,25 @@ impl IncrementalDagVerification {
             bail!("Incremental verification failed. Block state is: {block_state:?}, expected BlockState::Want");
         }
 
-        // TODO(matheus23): Verify hash before putting it into the blockstore.
+        let hash_func: Code = cid
+            .hash()
+            .code()
+            .try_into()
+            .map_err(|_| anyhow!("Unsupported hash code in CID {cid}"))?;
+
+        let hash = hash_func.digest(bytes.as_ref());
+
+        if &hash != cid.hash() {
+            let result_cid = Cid::new_v1(cid.codec(), hash);
+            bail!("Digest mismatch in CAR file: expected {cid}, got {result_cid}");
+        }
+
         let result_cid = store.put_block(bytes, cid.codec()).await?;
 
         // TODO(matheus23): The BlockStore chooses the hashing function,
         // so it may choose a different hashing function, causing a mismatch
         if result_cid != cid {
-            bail!("Digest mismatch in CAR file: expected {cid}, got {result_cid}");
+            bail!("BlockStore uses an incompatible hashing function: CID mismatched, expected {cid}, got {result_cid}");
         }
 
         self.update_have_cids(store).await?;
