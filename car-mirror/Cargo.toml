@@ -8,7 +8,7 @@ include = ["/src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "Apache-2.0 or MIT"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.64"
+rust-version = "1.66"
 documentation = "https://docs.rs/car-mirror"
 repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror"
 authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
@@ -24,16 +24,32 @@ doc = true
 
 [dependencies]
 anyhow = "1.0"
+async-stream = "0.3.5"
+async-trait = "0.1.73"
+bytes = "1.4.0"
+deterministic-bloom = "0.1"
+futures = "0.3.28"
+iroh-car = "0.3.0"
+libipld = "0.16.0"
+libipld-core = "0.16.0"
 proptest = { version = "1.1", optional = true }
+roaring-graphs = { version = "0.12", optional = true }
+serde = "1.0.183"
+serde_ipld_dagcbor = "0.4.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+wnfs-common = "0.1.23"
 
 [dev-dependencies]
+async-std = { version = "1.11", features = ["attributes"] }
+car-mirror = { path = ".", features = ["test_utils"] }
 proptest = "1.1"
+roaring-graphs = "0.12"
+test-strategy = "0.3"
 
 [features]
 default = []
-test_utils = ["proptest"]
+test_utils = ["proptest", "roaring-graphs"]
 
 [package.metadata.docs.rs]
 all-features = true

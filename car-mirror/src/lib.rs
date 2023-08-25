@@ -4,27 +4,20 @@
 
 //! car-mirror
 
-/// Test utilities.
+/// Test utilities. Enabled with the `test_utils` feature flag.
 #[cfg(any(test, feature = "test_utils"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
 pub mod test_utils;
 
-/// Add two integers together.
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
-}
-
-/// Multiplies two integers together.
-pub fn mult(a: i32, b: i32) -> i32 {
-    a * b
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_mult() {
-        assert_eq!(mult(3, 2), 6);
-    }
-}
+/// Common utilities
+pub mod common;
+/// Algorithms for walking IPLD directed acyclic graphs
+pub mod dag_walk;
+/// Algorithms for doing incremental verification of IPLD DAGs on the receiving end.
+pub mod incremental_verification;
+/// Data types that are sent over-the-wire and relevant serialization code.
+pub mod messages;
+/// The CAR mirror pull protocol. Meant to be used qualified, i.e. `pull::request` and `pull::response`
+pub mod pull;
+/// The CAR mirror push protocol. Meant to be used qualified, i.e. `push::request` and `push::response`
+pub mod push;
