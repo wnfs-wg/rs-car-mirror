@@ -32,7 +32,7 @@ pub async fn request(
 /// in the given `store`, if the blocks can be shown to relate
 /// to the `root` CID.
 ///
-/// Returnes a response that gives the client information about what
+/// Returns a response that gives the client information about what
 /// other data remains to be fetched.
 pub async fn response(
     root: Cid,
