@@ -76,7 +76,7 @@ impl DagWalk {
         // - skip Raw CIDs. They can't have further links (but needs adjustment to this function's return type)
         // - run multiple `get_block` calls concurrently
         let block = store.get_block(&cid).await?;
-        for ref_cid in references(cid, &block)? {
+        for ref_cid in references(cid, &block, HashSet::new())? {
             if !self.visited.contains(&ref_cid) {
                 self.frontier.push_front(ref_cid);
             }
@@ -112,7 +112,7 @@ impl DagWalk {
     /// Skip a node from the traversal for now.
     pub fn skip_walking(&mut self, block: (Cid, Bytes)) -> Result<()> {
         let (cid, bytes) = block;
-        let refs = references(cid, bytes)?;
+        let refs = references(cid, bytes, HashSet::new())?;
         self.visited.insert(cid);
         self.frontier
             .retain(|frontier_cid| !refs.contains(frontier_cid));

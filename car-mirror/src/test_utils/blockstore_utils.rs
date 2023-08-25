@@ -37,7 +37,7 @@ pub fn dag_to_dot(
 
     for (cid, ipld) in blocks {
         let bytes = encode(&ipld)?;
-        let refs = references(cid, bytes)?;
+        let refs = references(cid, bytes, Vec::new())?;
         for to_cid in refs {
             print_truncated_string(writer, cid.to_string())?;
             write!(writer, " -> ")?;

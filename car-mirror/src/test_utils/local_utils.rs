@@ -24,7 +24,7 @@ pub(crate) async fn get_cid_at_approx_path(
     let mut working_cid = root;
     for nth in path {
         let block = store.get_block(&working_cid).await?;
-        let refs = references(working_cid, block)?;
+        let refs = references(working_cid, block, Vec::new())?;
         if refs.is_empty() {
             break;
         }

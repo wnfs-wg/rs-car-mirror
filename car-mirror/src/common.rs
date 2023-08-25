@@ -207,13 +207,12 @@ pub async fn block_receive(
 /// This will error out if
 /// - the codec is not supported
 /// - the block can't be parsed.
-pub fn references(cid: Cid, block: impl AsRef<[u8]>) -> Result<Vec<Cid>> {
+pub fn references<E: Extend<Cid>>(cid: Cid, block: impl AsRef<[u8]>, mut refs: E) -> Result<E> {
     let codec: IpldCodec = cid
         .codec()
         .try_into()
         .map_err(|_| anyhow!("Unsupported codec in Cid: {cid}"))?;
 
-    let mut refs = Vec::new();
     <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
     Ok(refs)
 }
