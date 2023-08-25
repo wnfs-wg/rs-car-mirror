@@ -12,31 +12,9 @@ pub struct PullRequest {
     #[serde(rename = "rs")]
     pub resources: Vec<Cid>,
 
-    /// Bloom filter hash count
-    #[serde(rename = "bk")]
-    pub bloom_k: u32,
-
-    /// Bloom filter Binary
-    #[serde(rename = "bb")]
-    pub bloom: Vec<u8>,
-}
-
-/// Part of the initial message for push requests.
-/// The other part is simply tupled together with the actual initial
-/// CAR file.
-///
-/// Wire data type from the [specification].
-///
-/// [specification]: https://github.com/fission-codes/spec/blob/86fcfb07d507f1df4fdaaf49088abecbb1dda76a/car-pool/car-mirror/http.md#22-requestor-payload
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PushRequestHeader {
-    /// Bloom filter hash count
-    #[serde(rename = "bk")]
-    pub bloom_k: u32,
-
-    /// Bloom filter Binary
-    #[serde(rename = "bb")]
-    pub bloom: Vec<u8>,
+    /// A bloom containing already stored blocks
+    #[serde(flatten)]
+    pub bloom: Bloom,
 }
 
 /// The response sent after the initial and subsequent push requests.
@@ -50,13 +28,21 @@ pub struct PushResponse {
     #[serde(rename = "sr")]
     pub subgraph_roots: Vec<Cid>,
 
+    /// A bloom containing already stored blocks
+    #[serde(flatten)]
+    pub bloom: Bloom,
+}
+
+/// The serialization format for bloom filters in CAR mirror
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Bloom {
     /// Bloom filter hash count
     #[serde(rename = "bk")]
-    pub bloom_k: u32,
+    pub hash_count: u32,
 
     /// Bloom filter Binary
     #[serde(rename = "bb")]
-    pub bloom: Vec<u8>,
+    pub bytes: Vec<u8>,
 }
 
 impl PushResponse {

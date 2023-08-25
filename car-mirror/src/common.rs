@@ -11,7 +11,7 @@ use wnfs_common::BlockStore;
 use crate::{
     dag_walk::DagWalk,
     incremental_verification::{BlockState, IncrementalDagVerification},
-    messages::{PullRequest, PushResponse},
+    messages::{Bloom, PullRequest, PushResponse},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -226,28 +226,23 @@ impl From<PushResponse> for ReceiverState {
     fn from(push: PushResponse) -> Self {
         let PushResponse {
             subgraph_roots,
-            bloom_k,
             bloom,
         } = push;
 
         Self {
             missing_subgraph_roots: subgraph_roots,
-            have_cids_bloom: Self::bloom_deserialize(bloom_k, bloom),
+            have_cids_bloom: Self::bloom_deserialize(bloom),
         }
     }
 }
 
 impl From<PullRequest> for ReceiverState {
     fn from(pull: PullRequest) -> Self {
-        let PullRequest {
-            resources,
-            bloom_k,
-            bloom,
-        } = pull;
+        let PullRequest { resources, bloom } = pull;
 
         Self {
             missing_subgraph_roots: resources,
-            have_cids_bloom: Self::bloom_deserialize(bloom_k, bloom),
+            have_cids_bloom: Self::bloom_deserialize(bloom),
         }
     }
 }
@@ -259,11 +254,10 @@ impl From<ReceiverState> for PushResponse {
             have_cids_bloom,
         } = receiver_state;
 
-        let (bloom_k, bloom) = ReceiverState::bloom_serialize(have_cids_bloom);
+        let bloom = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PushResponse {
             subgraph_roots: missing_subgraph_roots,
-            bloom_k,
             bloom,
         }
     }
@@ -276,31 +270,36 @@ impl From<ReceiverState> for PullRequest {
             have_cids_bloom,
         } = receiver_state;
 
-        let (bloom_k, bloom) = ReceiverState::bloom_serialize(have_cids_bloom);
+        let bloom = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PullRequest {
             resources: missing_subgraph_roots,
-            bloom_k,
             bloom,
         }
     }
 }
 
 impl ReceiverState {
-    fn bloom_serialize(bloom: Option<BloomFilter>) -> (u32, Vec<u8>) {
+    fn bloom_serialize(bloom: Option<BloomFilter>) -> Bloom {
         match bloom {
-            Some(bloom) => (bloom.hash_count() as u32, bloom.as_bytes().to_vec()),
-            None => (3, Vec::new()),
+            Some(bloom) => Bloom {
+                hash_count: bloom.hash_count() as u32,
+                bytes: bloom.as_bytes().to_vec(),
+            },
+            None => Bloom {
+                hash_count: 3,
+                bytes: Vec::new(),
+            },
         }
     }
 
-    fn bloom_deserialize(bloom_k: u32, bloom: Vec<u8>) -> Option<BloomFilter> {
-        if bloom.is_empty() {
+    fn bloom_deserialize(bloom: Bloom) -> Option<BloomFilter> {
+        if bloom.bytes.is_empty() {
             None
         } else {
             Some(BloomFilter::new_with(
-                bloom_k as usize,
-                bloom.into_boxed_slice(),
+                bloom.hash_count as usize,
+                bloom.bytes.into_boxed_slice(),
             ))
         }
     }
