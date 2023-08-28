@@ -13,6 +13,8 @@ pub mod test_utils;
 pub mod common;
 /// Algorithms for walking IPLD directed acyclic graphs
 pub mod dag_walk;
+/// Error types
+pub mod error;
 /// Algorithms for doing incremental verification of IPLD DAGs on the receiving end.
 pub mod incremental_verification;
 /// Data types that are sent over-the-wire and relevant serialization code.

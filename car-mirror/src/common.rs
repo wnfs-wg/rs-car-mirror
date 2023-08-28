@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::anyhow;
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
 use futures::TryStreamExt;
@@ -11,6 +11,7 @@ use wnfs_common::BlockStore;
 
 use crate::{
     dag_walk::DagWalk,
+    error::Error,
     incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{Bloom, PullRequest, PushResponse},
 };
@@ -70,7 +71,7 @@ pub async fn block_send(
     last_state: Option<ReceiverState>,
     config: &Config,
     store: &impl BlockStore,
-) -> Result<CarFile> {
+) -> Result<CarFile, Error> {
     let ReceiverState {
         ref missing_subgraph_roots,
         have_cids_bloom,
@@ -128,7 +129,10 @@ pub async fn block_send(
         Vec::new(),
     );
 
-    writer.write_header().await?;
+    writer
+        .write_header()
+        .await
+        .map_err(|e| Error::CarFileError(anyhow!(e)))?;
 
     let mut block_bytes = 0;
     let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
@@ -150,7 +154,10 @@ pub async fn block_send(
             "writing block to CAR",
         );
 
-        writer.write(cid, &block).await?;
+        writer
+            .write(cid, &block)
+            .await
+            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
 
         // TODO(matheus23): Count the actual bytes sent?
         // At the moment, this is a rough estimate. iroh-car could be improved to return the written bytes.
@@ -161,7 +168,11 @@ pub async fn block_send(
     }
 
     Ok(CarFile {
-        bytes: writer.finish().await?.into(),
+        bytes: writer
+            .finish()
+            .await
+            .map_err(|e| Error::CarFileError(anyhow!(e)))?
+            .into(),
     })
 }
 
@@ -179,14 +190,20 @@ pub async fn block_receive(
     last_car: Option<CarFile>,
     config: &Config,
     store: &impl BlockStore,
-) -> Result<ReceiverState> {
+) -> Result<ReceiverState, Error> {
     let mut dag_verification = IncrementalDagVerification::new([root], store).await?;
 
     if let Some(car) = last_car {
-        let mut reader = CarReader::new(Cursor::new(car.bytes)).await?;
+        let mut reader = CarReader::new(Cursor::new(car.bytes))
+            .await
+            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
         let mut block_bytes = 0;
 
-        while let Some((cid, vec)) = reader.next_block().await? {
+        while let Some((cid, vec)) = reader
+            .next_block()
+            .await
+            .map_err(|e| Error::CarFileError(anyhow!(e)))?
+        {
             let block = Bytes::from(vec);
 
             debug!(
@@ -197,10 +214,10 @@ pub async fn block_receive(
 
             block_bytes += block.len();
             if block_bytes > config.receive_maximum {
-                bail!(
-                    "Received more than {} bytes ({block_bytes}), aborting request.",
-                    config.receive_maximum
-                );
+                return Err(Error::TooManyBytes {
+                    block_bytes,
+                    receive_maximum: config.receive_maximum,
+                });
             }
 
             match dag_verification.block_state(cid) {
@@ -273,13 +290,18 @@ pub async fn block_receive(
 /// This will error out if
 /// - the codec is not supported
 /// - the block can't be parsed.
-pub fn references<E: Extend<Cid>>(cid: Cid, block: impl AsRef<[u8]>, mut refs: E) -> Result<E> {
+pub fn references<E: Extend<Cid>>(
+    cid: Cid,
+    block: impl AsRef<[u8]>,
+    mut refs: E,
+) -> Result<E, Error> {
     let codec: IpldCodec = cid
         .codec()
         .try_into()
-        .map_err(|_| anyhow!("Unsupported codec in Cid: {cid}"))?;
+        .map_err(|_| Error::UnsupportedCodec { cid })?;
 
-    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
+    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)
+        .map_err(Error::ParsingError)?;
     Ok(refs)
 }
 

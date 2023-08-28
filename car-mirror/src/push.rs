@@ -1,8 +1,8 @@
 use crate::{
     common::{block_receive, block_send, CarFile, Config, ReceiverState},
+    error::Error,
     messages::PushResponse,
 };
-use anyhow::Result;
 use libipld_core::cid::Cid;
 use wnfs_common::BlockStore;
 
@@ -21,7 +21,7 @@ pub async fn request(
     last_response: Option<PushResponse>,
     config: &Config,
     store: &impl BlockStore,
-) -> Result<CarFile> {
+) -> Result<CarFile, Error> {
     let receiver_state = last_response.map(ReceiverState::from);
     block_send(root, receiver_state, config, store).await
 }
@@ -39,7 +39,7 @@ pub async fn response(
     request: CarFile,
     config: &Config,
     store: &impl BlockStore,
-) -> Result<PushResponse> {
+) -> Result<PushResponse, Error> {
     Ok(block_receive(root, Some(request), config, store)
         .await?
         .into())

@@ -1,5 +1,7 @@
-use crate::dag_walk::DagWalk;
-use anyhow::{anyhow, bail, Result};
+use crate::{
+    dag_walk::DagWalk,
+    error::{Error, IncrementalVerificationError},
+};
 use bytes::Bytes;
 use libipld_core::{
     cid::Cid,
@@ -37,7 +39,7 @@ impl IncrementalDagVerification {
     pub async fn new(
         roots: impl IntoIterator<Item = Cid>,
         store: &impl BlockStore,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let mut this = Self {
             want_cids: roots.into_iter().collect(),
             have_cids: HashSet::new(),
@@ -49,20 +51,21 @@ impl IncrementalDagVerification {
     }
 
     #[instrument(level = "trace", skip_all, fields(num_want = self.want_cids.len(), num_have = self.have_cids.len()))]
-    async fn update_have_cids(&mut self, store: &impl BlockStore) -> Result<()> {
+    async fn update_have_cids(&mut self, store: &impl BlockStore) -> Result<(), Error> {
         let mut dag_walk = DagWalk::breadth_first(self.want_cids.iter().cloned());
 
         loop {
             match dag_walk.next(store).await {
-                Err(e) => {
+                Err(Error::BlockStoreError(e)) => {
                     if let Some(BlockStoreError::CIDNotFound(not_found)) =
                         e.downcast_ref::<BlockStoreError>()
                     {
                         self.want_cids.insert(*not_found);
                     } else {
-                        bail!(e);
+                        return Err(Error::BlockStoreError(e));
                     }
                 }
+                Err(e) => return Err(e),
                 Ok(Some((cid, _))) => {
                     self.want_cids.remove(&cid);
                     self.have_cids.insert(cid);
@@ -106,33 +109,47 @@ impl IncrementalDagVerification {
         &mut self,
         block: (Cid, Bytes),
         store: &impl BlockStore,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let (cid, bytes) = block;
 
         let block_state = self.block_state(cid);
         if !matches!(block_state, BlockState::Want) {
-            bail!("Incremental verification failed. Block state is: {block_state:?}, expected BlockState::Want");
+            return Err(IncrementalVerificationError::ExpectedWantedBlock {
+                cid: Box::new(cid),
+                block_state,
+            }
+            .into());
         }
 
         let hash_func: Code = cid
             .hash()
             .code()
             .try_into()
-            .map_err(|_| anyhow!("Unsupported hash code in CID {cid}"))?;
+            .map_err(|_| Error::UnsupportedHashCode { cid })?;
 
         let hash = hash_func.digest(bytes.as_ref());
 
         if &hash != cid.hash() {
-            let result_cid = Cid::new_v1(cid.codec(), hash);
-            bail!("Digest mismatch in CAR file: expected {cid}, got {result_cid}");
+            let actual_cid = Cid::new_v1(cid.codec(), hash);
+            return Err(IncrementalVerificationError::DigestMismatch {
+                cid: Box::new(cid),
+                actual_cid: Box::new(actual_cid),
+            }
+            .into());
         }
 
-        let result_cid = store.put_block(bytes, cid.codec()).await?;
+        let actual_cid = store
+            .put_block(bytes, cid.codec())
+            .await
+            .map_err(Error::BlockStoreError)?;
 
         // TODO(matheus23): The BlockStore chooses the hashing function,
         // so it may choose a different hashing function, causing a mismatch
-        if result_cid != cid {
-            bail!("BlockStore uses an incompatible hashing function: CID mismatched, expected {cid}, got {result_cid}");
+        if actual_cid != cid {
+            return Err(Error::BlockStoreIncompatible {
+                cid: Box::new(cid),
+                actual_cid: Box::new(actual_cid),
+            });
         }
 
         self.update_have_cids(store).await?;

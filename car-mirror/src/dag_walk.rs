@@ -1,5 +1,4 @@
-use crate::common::references;
-use anyhow::Result;
+use crate::{common::references, error::Error};
 use bytes::Bytes;
 use futures::{stream::try_unfold, Stream};
 use libipld_core::cid::Cid;
@@ -54,7 +53,7 @@ impl DagWalk {
     /// Return the next node in the traversal.
     ///
     /// Returns `None` if no nodes are left to be visited.
-    pub async fn next(&mut self, store: &impl BlockStore) -> Result<Option<(Cid, Bytes)>> {
+    pub async fn next(&mut self, store: &impl BlockStore) -> Result<Option<(Cid, Bytes)>, Error> {
         let cid = loop {
             let popped = if self.breadth_first {
                 self.frontier.pop_back()
@@ -75,7 +74,10 @@ impl DagWalk {
         // TODO: Two opportunities for performance improvement:
         // - skip Raw CIDs. They can't have further links (but needs adjustment to this function's return type)
         // - run multiple `get_block` calls concurrently
-        let block = store.get_block(&cid).await?;
+        let block = store
+            .get_block(&cid)
+            .await
+            .map_err(Error::BlockStoreError)?;
         for ref_cid in references(cid, &block, Vec::new())? {
             if !self.visited.contains(&ref_cid) {
                 self.frontier.push_front(ref_cid);
@@ -89,7 +91,7 @@ impl DagWalk {
     pub fn stream(
         self,
         store: &impl BlockStore,
-    ) -> impl Stream<Item = Result<(Cid, Bytes)>> + Unpin + '_ {
+    ) -> impl Stream<Item = Result<(Cid, Bytes), Error>> + Unpin + '_ {
         Box::pin(try_unfold(self, move |mut this| async move {
             let maybe_block = this.next(store).await?;
             Ok(maybe_block.map(|b| (b, this)))
@@ -110,7 +112,7 @@ impl DagWalk {
     }
 
     /// Skip a node from the traversal for now.
-    pub fn skip_walking(&mut self, block: (Cid, Bytes)) -> Result<()> {
+    pub fn skip_walking(&mut self, block: (Cid, Bytes)) -> Result<(), Error> {
         let (cid, bytes) = block;
         let refs = references(cid, bytes, HashSet::new())?;
         self.visited.insert(cid);
@@ -124,6 +126,7 @@ impl DagWalk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use futures::TryStreamExt;
     use libipld::Ipld;
     use wnfs_common::MemoryBlockStore;
