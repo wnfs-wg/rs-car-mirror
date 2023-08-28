@@ -6,6 +6,7 @@ use libipld_core::{
     multihash::{Code, MultihashDigest},
 };
 use std::{collections::HashSet, matches};
+use tracing::instrument;
 use wnfs_common::{BlockStore, BlockStoreError};
 
 /// A data structure that keeps state about incremental DAG verification.
@@ -47,6 +48,7 @@ impl IncrementalDagVerification {
         Ok(this)
     }
 
+    #[instrument(level = "trace", skip_all, fields(num_want = self.want_cids.len(), num_have = self.have_cids.len()))]
     async fn update_have_cids(&mut self, store: &impl BlockStore) -> Result<()> {
         let mut dag_walk = DagWalk::breadth_first(self.want_cids.iter().cloned());
 
