@@ -1,3 +1,5 @@
+#![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
+
 use crate::{
     dag_walk::DagWalk,
     error::{Error, IncrementalVerificationError},

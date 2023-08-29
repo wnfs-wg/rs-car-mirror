@@ -1,3 +1,5 @@
+#![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
+
 use anyhow::anyhow;
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
