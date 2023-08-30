@@ -33,6 +33,7 @@ iroh-car = "0.3.0"
 libipld = "0.16.0"
 libipld-core = "0.16.0"
 proptest = { version = "1.1", optional = true }
+quick_cache = "0.4.0"
 roaring-graphs = { version = "0.12", optional = true }
 serde = "1.0.183"
 serde_ipld_dagcbor = "0.4.0"

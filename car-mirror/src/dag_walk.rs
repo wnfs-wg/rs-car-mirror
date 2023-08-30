@@ -1,7 +1,6 @@
-use crate::{common::references, error::Error};
+use crate::{common::references, error::Error, traits::Cache};
 use bytes::Bytes;
 use futures::{stream::try_unfold, Stream};
-use libipld::IpldCodec;
 use libipld_core::cid::Cid;
 use std::collections::{HashSet, VecDeque};
 use wnfs_common::BlockStore;
@@ -54,7 +53,11 @@ impl DagWalk {
     /// Return the next node in the traversal.
     ///
     /// Returns `None` if no nodes are left to be visited.
-    pub async fn next(&mut self, store: &impl BlockStore) -> Result<Option<Cid>, Error> {
+    pub async fn next(
+        &mut self,
+        store: &impl BlockStore,
+        cache: &impl Cache,
+    ) -> Result<Option<Cid>, Error> {
         let cid = loop {
             let popped = if self.breadth_first {
                 self.frontier.pop_back()
@@ -72,19 +75,14 @@ impl DagWalk {
             }
         };
 
-        // raw codecs can't have further links
-        let raw_codec: u64 = IpldCodec::Raw.into();
-        if cid.codec() != raw_codec {
-            // TODO: Two opportunities for performance improvement:
-            // - run multiple `get_block` calls concurrently
-            let block = store
-                .get_block(&cid)
-                .await
-                .map_err(Error::BlockStoreError)?;
-            for ref_cid in references(cid, &block, Vec::new())? {
-                if !self.visited.contains(&ref_cid) {
-                    self.frontier.push_front(ref_cid);
-                }
+        let refs = cache
+            .references(cid, store)
+            .await
+            .map_err(Error::BlockStoreError)?;
+
+        for ref_cid in refs {
+            if !self.visited.contains(&ref_cid) {
+                self.frontier.push_front(ref_cid);
             }
         }
 
@@ -92,12 +90,13 @@ impl DagWalk {
     }
 
     /// Turn this traversal into a stream
-    pub fn stream(
+    pub fn stream<'a>(
         self,
-        store: &impl BlockStore,
-    ) -> impl Stream<Item = Result<Cid, Error>> + Unpin + '_ {
+        store: &'a impl BlockStore,
+        cache: &'a impl Cache,
+    ) -> impl Stream<Item = Result<Cid, Error>> + Unpin + 'a {
         Box::pin(try_unfold(self, move |mut this| async move {
-            let maybe_block = this.next(store).await?;
+            let maybe_block = this.next(store, cache).await?;
             Ok(maybe_block.map(|b| (b, this)))
         }))
     }
@@ -118,7 +117,7 @@ impl DagWalk {
     /// Skip a node from the traversal for now.
     pub fn skip_walking(&mut self, block: (Cid, Bytes)) -> Result<(), Error> {
         let (cid, bytes) = block;
-        let refs = references(cid, bytes, HashSet::new())?;
+        let refs = references(cid, bytes, HashSet::new()).map_err(Error::ParsingError)?;
         self.visited.insert(cid);
         self.frontier
             .retain(|frontier_cid| !refs.contains(frontier_cid));
@@ -130,6 +129,7 @@ impl DagWalk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::NoCache;
     use anyhow::Result;
     use futures::TryStreamExt;
     use libipld::Ipld;
@@ -160,7 +160,7 @@ mod tests {
             .await?;
 
         let cids = DagWalk::breadth_first([cid_root])
-            .stream(store)
+            .stream(store, &NoCache())
             .try_collect::<Vec<_>>()
             .await?
             .into_iter()
@@ -175,7 +175,7 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::test_utils::arb_ipld_dag;
+    use crate::{test_utils::arb_ipld_dag, traits::NoCache};
     use futures::TryStreamExt;
     use libipld::{
         multihash::{Code, MultihashDigest},
@@ -202,6 +202,7 @@ mod proptests {
         async_std::task::block_on(async {
             let (dag, root) = dag;
             let store = &MemoryBlockStore::new();
+
             for (cid, ipld) in dag.iter() {
                 let block: Bytes = encode(ipld).unwrap().into();
                 let cid_store = store
@@ -212,7 +213,7 @@ mod proptests {
             }
 
             let mut cids = DagWalk::breadth_first([root])
-                .stream(store)
+                .stream(store, &NoCache())
                 .try_collect::<Vec<_>>()
                 .await
                 .unwrap();

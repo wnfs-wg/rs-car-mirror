@@ -16,6 +16,7 @@ use crate::{
     error::Error,
     incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{Bloom, PullRequest, PushResponse},
+    traits::Cache,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -67,12 +68,13 @@ pub struct CarFile {
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip(config, store))]
+#[instrument(skip(config, store, cache))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<CarFile, Error> {
     let ReceiverState {
         ref missing_subgraph_roots,
@@ -83,7 +85,8 @@ pub async fn block_send(
     });
 
     // Verify that all missing subgraph roots are in the relevant DAG:
-    let subgraph_roots = verify_missing_subgraph_roots(root, missing_subgraph_roots, store).await?;
+    let subgraph_roots =
+        verify_missing_subgraph_roots(root, missing_subgraph_roots, store, cache).await?;
 
     let bloom = handle_missing_bloom(have_cids_bloom);
 
@@ -112,6 +115,7 @@ pub async fn block_send(
         &bloom,
         config.send_minimum,
         store,
+        cache,
     )
     .await?;
 
@@ -132,14 +136,15 @@ pub async fn block_send(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip(last_car, config, store), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[instrument(skip(last_car, config, store, cache), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<ReceiverState, Error> {
-    let mut dag_verification = IncrementalDagVerification::new([root], store).await?;
+    let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
 
     if let Some(car) = last_car {
         let mut reader = CarReader::new(Cursor::new(car.bytes))
@@ -151,6 +156,7 @@ pub async fn block_receive(
             &mut reader,
             config.receive_maximum,
             store,
+            cache,
         )
         .await?;
     }
@@ -211,14 +217,13 @@ pub fn references<E: Extend<Cid>>(
     cid: Cid,
     block: impl AsRef<[u8]>,
     mut refs: E,
-) -> Result<E, Error> {
+) -> Result<E, anyhow::Error> {
     let codec: IpldCodec = cid
         .codec()
         .try_into()
         .map_err(|_| Error::UnsupportedCodec { cid })?;
 
-    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)
-        .map_err(Error::ParsingError)?;
+    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
     Ok(refs)
 }
 
@@ -230,9 +235,10 @@ async fn verify_missing_subgraph_roots(
     root: Cid,
     missing_subgraph_roots: &Vec<Cid>,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<Vec<Cid>, Error> {
     let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
-        .stream(store)
+        .stream(store, cache)
         .try_filter_map(
             |cid| async move { Ok(missing_subgraph_roots.contains(&cid).then_some(cid)) },
         )
@@ -276,11 +282,12 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     bloom: &BloomFilter,
     send_minimum: usize,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<(), Error> {
     let mut block_bytes = 0;
     let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
 
-    while let Some(cid) = dag_walk.next(store).await? {
+    while let Some(cid) = dag_walk.next(store, cache).await? {
         let block = store
             .get_block(&cid)
             .await
@@ -324,6 +331,7 @@ async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
     reader: &mut CarReader<R>,
     receive_maximum: usize,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<(), Error> {
     let mut block_bytes = 0;
     while let Some((cid, vec)) = reader
@@ -358,7 +366,7 @@ async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
             }
             BlockState::Want => {
                 dag_verification
-                    .verify_and_store_block((cid, block), store)
+                    .verify_and_store_block((cid, block), store, cache)
                     .await?;
             }
         }

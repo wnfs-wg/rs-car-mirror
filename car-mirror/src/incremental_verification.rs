@@ -3,6 +3,7 @@
 use crate::{
     dag_walk::DagWalk,
     error::{Error, IncrementalVerificationError},
+    traits::Cache,
 };
 use bytes::Bytes;
 use libipld_core::{
@@ -41,23 +42,28 @@ impl IncrementalDagVerification {
     pub async fn new(
         roots: impl IntoIterator<Item = Cid>,
         store: &impl BlockStore,
+        cache: &impl Cache,
     ) -> Result<Self, Error> {
         let mut this = Self {
             want_cids: roots.into_iter().collect(),
             have_cids: HashSet::new(),
         };
 
-        this.update_have_cids(store).await?;
+        this.update_have_cids(store, cache).await?;
 
         Ok(this)
     }
 
     #[instrument(level = "trace", skip_all, fields(num_want = self.want_cids.len(), num_have = self.have_cids.len()))]
-    async fn update_have_cids(&mut self, store: &impl BlockStore) -> Result<(), Error> {
+    async fn update_have_cids(
+        &mut self,
+        store: &impl BlockStore,
+        cache: &impl Cache,
+    ) -> Result<(), Error> {
         let mut dag_walk = DagWalk::breadth_first(self.want_cids.iter().cloned());
 
         loop {
-            match dag_walk.next(store).await {
+            match dag_walk.next(store, cache).await {
                 Err(Error::BlockStoreError(e)) => {
                     if let Some(BlockStoreError::CIDNotFound(not_found)) =
                         e.downcast_ref::<BlockStoreError>()
@@ -111,6 +117,7 @@ impl IncrementalDagVerification {
         &mut self,
         block: (Cid, Bytes),
         store: &impl BlockStore,
+        cache: &impl Cache,
     ) -> Result<(), Error> {
         let (cid, bytes) = block;
 
@@ -154,7 +161,7 @@ impl IncrementalDagVerification {
             });
         }
 
-        self.update_have_cids(store).await?;
+        self.update_have_cids(store, cache).await?;
 
         Ok(())
     }

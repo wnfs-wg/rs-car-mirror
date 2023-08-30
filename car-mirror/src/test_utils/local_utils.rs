@@ -1,6 +1,6 @@
 ///! Crate-local test utilities
 use super::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore, Rvg};
-use crate::{common::references, dag_walk::DagWalk, error::Error};
+use crate::{common::references, dag_walk::DagWalk, error::Error, traits::NoCache};
 use anyhow::Result;
 use futures::TryStreamExt;
 use libipld::{Cid, Ipld};
@@ -70,7 +70,7 @@ pub(crate) async fn setup_random_dag(
 
 pub(crate) async fn total_dag_bytes(root: Cid, store: &impl BlockStore) -> Result<usize> {
     Ok(DagWalk::breadth_first([root])
-        .stream(store)
+        .stream(store, &NoCache())
         .try_filter_map(|cid| async move {
             let block = store
                 .get_block(&cid)
@@ -86,7 +86,7 @@ pub(crate) async fn total_dag_bytes(root: Cid, store: &impl BlockStore) -> Resul
 
 pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Result<usize> {
     Ok(DagWalk::breadth_first([root])
-        .stream(store)
+        .stream(store, &NoCache())
         .try_collect::<Vec<_>>()
         .await?
         .len())
