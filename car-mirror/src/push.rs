@@ -98,12 +98,10 @@ mod tests {
         // receiver should have all data
         let client_cids = DagWalk::breadth_first([root])
             .stream(client_store)
-            .map_ok(|(cid, _)| cid)
             .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
             .stream(server_store)
-            .map_ok(|(cid, _)| cid)
             .try_collect::<HashSet<_>>()
             .await?;
 
@@ -210,13 +208,11 @@ mod proptests {
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
                 .stream(client_store)
-                .map_ok(|(cid, _)| cid)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
                 .stream(server_store)
-                .map_ok(|(cid, _)| cid)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();

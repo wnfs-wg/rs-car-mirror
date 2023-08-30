@@ -1,6 +1,7 @@
 use crate::{common::references, error::Error};
 use bytes::Bytes;
 use futures::{stream::try_unfold, Stream};
+use libipld::IpldCodec;
 use libipld_core::cid::Cid;
 use std::collections::{HashSet, VecDeque};
 use wnfs_common::BlockStore;
@@ -53,7 +54,7 @@ impl DagWalk {
     /// Return the next node in the traversal.
     ///
     /// Returns `None` if no nodes are left to be visited.
-    pub async fn next(&mut self, store: &impl BlockStore) -> Result<Option<(Cid, Bytes)>, Error> {
+    pub async fn next(&mut self, store: &impl BlockStore) -> Result<Option<Cid>, Error> {
         let cid = loop {
             let popped = if self.breadth_first {
                 self.frontier.pop_back()
@@ -71,27 +72,30 @@ impl DagWalk {
             }
         };
 
-        // TODO: Two opportunities for performance improvement:
-        // - skip Raw CIDs. They can't have further links (but needs adjustment to this function's return type)
-        // - run multiple `get_block` calls concurrently
-        let block = store
-            .get_block(&cid)
-            .await
-            .map_err(Error::BlockStoreError)?;
-        for ref_cid in references(cid, &block, Vec::new())? {
-            if !self.visited.contains(&ref_cid) {
-                self.frontier.push_front(ref_cid);
+        // raw codecs can't have further links
+        let raw_codec: u64 = IpldCodec::Raw.into();
+        if cid.codec() != raw_codec {
+            // TODO: Two opportunities for performance improvement:
+            // - run multiple `get_block` calls concurrently
+            let block = store
+                .get_block(&cid)
+                .await
+                .map_err(Error::BlockStoreError)?;
+            for ref_cid in references(cid, &block, Vec::new())? {
+                if !self.visited.contains(&ref_cid) {
+                    self.frontier.push_front(ref_cid);
+                }
             }
         }
 
-        Ok(Some((cid, block)))
+        Ok(Some(cid))
     }
 
     /// Turn this traversal into a stream
     pub fn stream(
         self,
         store: &impl BlockStore,
-    ) -> impl Stream<Item = Result<(Cid, Bytes), Error>> + Unpin + '_ {
+    ) -> impl Stream<Item = Result<Cid, Error>> + Unpin + '_ {
         Box::pin(try_unfold(self, move |mut this| async move {
             let maybe_block = this.next(store).await?;
             Ok(maybe_block.map(|b| (b, this)))
@@ -160,7 +164,6 @@ mod tests {
             .try_collect::<Vec<_>>()
             .await?
             .into_iter()
-            .map(|(cid, _block)| cid)
             .collect::<Vec<_>>();
 
         assert_eq!(cids, vec![cid_root, cid_1_wrap, cid_2, cid_3, cid_1]);
@@ -210,7 +213,6 @@ mod proptests {
 
             let mut cids = DagWalk::breadth_first([root])
                 .stream(store)
-                .map_ok(|(cid, _)| cid)
                 .try_collect::<Vec<_>>()
                 .await
                 .unwrap();

@@ -392,6 +392,7 @@ dependencies = [
  "serde_ipld_dagcbor",
  "test-strategy",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "wnfs-common",

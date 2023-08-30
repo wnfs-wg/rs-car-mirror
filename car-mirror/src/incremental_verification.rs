@@ -68,7 +68,7 @@ impl IncrementalDagVerification {
                     }
                 }
                 Err(e) => return Err(e),
-                Ok(Some((cid, _))) => {
+                Ok(Some(cid)) => {
                     self.want_cids.remove(&cid);
                     self.have_cids.insert(cid);
                 }
