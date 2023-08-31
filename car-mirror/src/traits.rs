@@ -11,8 +11,8 @@ use wnfs_common::BlockStore;
 /// At the moment, all caches are conceptually memoization tables, so you don't
 /// necessarily need to think about being careful about cache eviction.
 ///
-/// See `InMemoryCache` for a `quick_cache`-based implementation, and
-/// `NoCache` for disabling the cache.
+/// See `InMemoryCache` for a `quick_cache`-based implementation
+/// (enable the `quick-cache` feature), and `NoCache` for disabling the cache.
 #[async_trait(?Send)]
 pub trait Cache {
     /// This returns further references from the block referenced by given CID,
@@ -51,11 +51,13 @@ pub trait Cache {
 /// A [quick-cache]-based implementation of a car mirror cache.
 ///
 /// [quick-cache]: https://github.com/arthurprs/quick-cache/
+#[cfg(feature = "quick_cache")]
 #[derive(Debug)]
 pub struct InMemoryCache {
     references: quick_cache::sync::Cache<Cid, Vec<Cid>>,
 }
 
+#[cfg(feature = "quick_cache")]
 impl InMemoryCache {
     /// Create a new in-memory cache that approximately holds
     /// cached references for `approx_capacity` CIDs.
@@ -82,6 +84,7 @@ impl InMemoryCache {
     }
 }
 
+#[cfg(feature = "quick_cache")]
 #[async_trait(?Send)]
 impl Cache for InMemoryCache {
     async fn get_references_cached(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
