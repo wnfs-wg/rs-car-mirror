@@ -99,7 +99,7 @@ impl Cache for InMemoryCache {
 
 /// An implementation of `Cache` that doesn't cache at all.
 #[derive(Debug)]
-pub struct NoCache();
+pub struct NoCache;
 
 #[async_trait(?Send)]
 impl Cache for NoCache {

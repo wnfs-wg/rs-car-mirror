@@ -70,7 +70,7 @@ pub(crate) async fn setup_random_dag(
 
 pub(crate) async fn total_dag_bytes(root: Cid, store: &impl BlockStore) -> Result<usize> {
     Ok(DagWalk::breadth_first([root])
-        .stream(store, &NoCache())
+        .stream(store, &NoCache)
         .try_filter_map(|cid| async move {
             let block = store
                 .get_block(&cid)
@@ -86,7 +86,7 @@ pub(crate) async fn total_dag_bytes(root: Cid, store: &impl BlockStore) -> Resul
 
 pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Result<usize> {
     Ok(DagWalk::breadth_first([root])
-        .stream(store, &NoCache())
+        .stream(store, &NoCache)
         .try_collect::<Vec<_>>()
         .await?
         .len())

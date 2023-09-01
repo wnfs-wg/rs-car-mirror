@@ -73,12 +73,11 @@ mod tests {
         server_store: &MemoryBlockStore,
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
-        let mut request =
-            crate::push::request(root, None, config, client_store, &NoCache()).await?;
+        let mut request = crate::push::request(root, None, config, client_store, &NoCache).await?;
         loop {
             let request_bytes = request.bytes.len();
             let response =
-                crate::push::response(root, request, config, server_store, &NoCache()).await?;
+                crate::push::response(root, request, config, server_store, &NoCache).await?;
             let response_bytes = serde_ipld_dagcbor::to_vec(&response)?.len();
 
             metrics.push(Metrics {
@@ -89,8 +88,8 @@ mod tests {
             if response.indicates_finished() {
                 break;
             }
-            request = crate::push::request(root, Some(response), config, client_store, &NoCache())
-                .await?;
+            request =
+                crate::push::request(root, Some(response), config, client_store, &NoCache).await?;
         }
 
         Ok(metrics)
@@ -104,11 +103,11 @@ mod tests {
 
         // receiver should have all data
         let client_cids = DagWalk::breadth_first([root])
-            .stream(client_store, &NoCache())
+            .stream(client_store, &NoCache)
             .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
-            .stream(server_store, &NoCache())
+            .stream(server_store, &NoCache)
             .try_collect::<HashSet<_>>()
             .await?;
 
@@ -215,12 +214,12 @@ mod proptests {
 
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
-                .stream(client_store, &NoCache())
+                .stream(client_store, &NoCache)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
-                .stream(server_store, &NoCache())
+                .stream(server_store, &NoCache)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();

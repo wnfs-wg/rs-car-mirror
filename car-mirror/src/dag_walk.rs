@@ -160,7 +160,7 @@ mod tests {
             .await?;
 
         let cids = DagWalk::breadth_first([cid_root])
-            .stream(store, &NoCache())
+            .stream(store, &NoCache)
             .try_collect::<Vec<_>>()
             .await?
             .into_iter()
@@ -213,7 +213,7 @@ mod proptests {
             }
 
             let mut cids = DagWalk::breadth_first([root])
-                .stream(store, &NoCache())
+                .stream(store, &NoCache)
                 .try_collect::<Vec<_>>()
                 .await
                 .unwrap();
