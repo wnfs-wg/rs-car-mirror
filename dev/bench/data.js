@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1692962460138,
+  "lastUpdate": 1693562152607,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -137,6 +137,54 @@ window.BENCHMARK_DATA = {
             "name": "pull cold",
             "value": 21402325,
             "range": "± 1076444",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6cea1d24e4f28996cf6452e1aa8dd84d076cbad7",
+          "message": "Merge pull request #29 from fission-codes/matheus23/tracing\n\nfeat: Implement tracing & `thiserror` error types",
+          "timestamp": "2023-09-01T11:53:47+02:00",
+          "tree_id": "65317c36b07400b9ec38446130d0f663409940bf",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/6cea1d24e4f28996cf6452e1aa8dd84d076cbad7"
+        },
+        "date": 1693562151386,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 42214794,
+            "range": "± 1830342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 42034503,
+            "range": "± 1220819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 17993429,
+            "range": "± 1682983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 19820564,
+            "range": "± 1224866",
             "unit": "ns/iter"
           }
         ]
