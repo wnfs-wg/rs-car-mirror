@@ -26,22 +26,22 @@ doc = true
 anyhow = "1.0"
 async-stream = "0.3.5"
 async-trait = "0.1.73"
-bytes = "1.4.0"
+bytes = "1.4"
 deterministic-bloom = "0.1"
-futures = "0.3.28"
-iroh-car = "0.3.0"
-libipld = "0.16.0"
-libipld-core = "0.16.0"
+futures = "0.3"
+iroh-car = "0.4"
+libipld = "0.16"
+libipld-core = "0.16"
 proptest = { version = "1.1", optional = true }
-quick_cache = { version = "0.4.0", optional = true }
+quick_cache = { version = "0.4", optional = true }
 roaring-graphs = { version = "0.12", optional = true }
-serde = "1.0.183"
-serde_ipld_dagcbor = "0.4.0"
-thiserror = "1.0.47"
+serde = "^1"
+serde_ipld_dagcbor = "0.4"
+thiserror = "1.0"
 tokio = { version = "^1", default-features = false }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-wnfs-common = "0.1.23"
+wnfs-common = "0.1.24"
 
 [dev-dependencies]
 async-std = { version = "1.11", features = ["attributes"] }
