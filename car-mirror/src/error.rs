@@ -50,10 +50,6 @@ pub enum Error {
     #[error("Error during block parsing: {0}")]
     ParsingError(anyhow::Error),
 
-    /// An error rasied when trying to read or write a CAR file.
-    #[error("CAR (de)serialization error: {0}")]
-    CarFileError(anyhow::Error),
-
     /// An error rasied from the blockstore.
     #[error("BlockStore error: {0}")]
     BlockStoreError(anyhow::Error),
@@ -64,6 +60,10 @@ pub enum Error {
     /// Errors related to incremental verification
     #[error(transparent)]
     IncrementalVerificationError(#[from] IncrementalVerificationError),
+
+    /// An error rasied when trying to read or write a CAR file.
+    #[error("CAR (de)serialization error: {0}")]
+    CarFileError(#[from] iroh_car::Error),
 }
 
 /// Errors related to incremental verification

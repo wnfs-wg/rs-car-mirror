@@ -1,6 +1,5 @@
 #![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
 
-use anyhow::anyhow;
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
 use futures::TryStreamExt;
@@ -115,11 +114,7 @@ pub async fn block_send(
     .await?;
 
     Ok(CarFile {
-        bytes: writer
-            .finish()
-            .await
-            .map_err(|e| Error::CarFileError(anyhow!(e)))?
-            .into(),
+        bytes: writer.finish().await?.into(),
     })
 }
 
@@ -142,9 +137,7 @@ pub async fn block_receive(
     let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
 
     if let Some(car) = last_car {
-        let mut reader = CarReader::new(Cursor::new(car.bytes))
-            .await
-            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
+        let mut reader = CarReader::new(Cursor::new(car.bytes)).await?;
 
         read_and_verify_blocks(
             &mut dag_verification,
@@ -305,10 +298,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
             "writing block to CAR",
         );
 
-        block_bytes += writer
-            .write(cid, &block)
-            .await
-            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
+        block_bytes += writer.write(cid, &block).await?;
 
         if block_bytes > send_minimum {
             break;
@@ -326,11 +316,7 @@ async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
     cache: &impl Cache,
 ) -> Result<(), Error> {
     let mut bytes_read = 0;
-    while let Some((cid, vec)) = reader
-        .next_block()
-        .await
-        .map_err(|e| Error::CarFileError(anyhow!(e)))?
-    {
+    while let Some((cid, vec)) = reader.next_block().await? {
         let block = Bytes::from(vec);
 
         debug!(
