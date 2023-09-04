@@ -7,12 +7,12 @@ use crate::incremental_verification::BlockState;
 pub enum Error {
     /// An error raised during receival of blocks, when more than the configured maximum
     /// bytes are received in a single batch. See the `Config` type.
-    #[error("Received more than {receive_maximum} bytes ({block_bytes}), aborting request.")]
+    #[error("Expected to receive no more than {receive_maximum} bytes, but got at least {bytes_read}, aborting request.")]
     TooManyBytes {
         /// The configured amount of maximum bytes to receive
         receive_maximum: usize,
         /// The actual amount of bytes received so far
-        block_bytes: usize,
+        bytes_read: usize,
     },
 
     /// This library only supports a subset of default codecs, including DAG-CBOR, DAG-JSON, DAG-PB and more.g

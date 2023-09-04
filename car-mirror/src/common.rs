@@ -104,11 +104,6 @@ pub async fn block_send(
         Vec::new(),
     );
 
-    writer
-        .write_header()
-        .await
-        .map_err(|e| Error::CarFileError(anyhow!(e)))?;
-
     write_blocks_into_car(
         &mut writer,
         subgraph_roots,
@@ -310,14 +305,11 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
             "writing block to CAR",
         );
 
-        writer
+        block_bytes += writer
             .write(cid, &block)
             .await
             .map_err(|e| Error::CarFileError(anyhow!(e)))?;
 
-        // TODO(matheus23): Count the actual bytes sent?
-        // At the moment, this is a rough estimate. iroh-car could be improved to return the written bytes.
-        block_bytes += block.len();
         if block_bytes > send_minimum {
             break;
         }
@@ -333,7 +325,7 @@ async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<(), Error> {
-    let mut block_bytes = 0;
+    let mut bytes_read = 0;
     while let Some((cid, vec)) = reader
         .next_block()
         .await
@@ -347,10 +339,10 @@ async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
             "reading block from CAR",
         );
 
-        block_bytes += block.len();
-        if block_bytes > receive_maximum {
+        bytes_read += block.len();
+        if bytes_read > receive_maximum {
             return Err(Error::TooManyBytes {
-                block_bytes,
+                bytes_read,
                 receive_maximum,
             });
         }
