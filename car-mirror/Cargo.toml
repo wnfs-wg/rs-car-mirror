@@ -29,7 +29,7 @@ async-trait = "0.1.73"
 bytes = "1.4.0"
 deterministic-bloom = "0.1"
 futures = "0.3.28"
-iroh-car = "0.3.0"
+iroh-car = "0.4.0"
 libipld = "0.16.0"
 libipld-core = "0.16.0"
 proptest = { version = "1.1", optional = true }
