@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1693562152607,
+  "lastUpdate": 1702463963456,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -185,6 +185,78 @@ window.BENCHMARK_DATA = {
             "name": "pull cold",
             "value": 19820564,
             "range": "± 1224866",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "distinct": true,
+          "id": "cb57d41625a2e40eaa0d41da157d3819a92fbd18",
+          "message": "chore: Fix types from merge",
+          "timestamp": "2023-12-13T11:34:45+01:00",
+          "tree_id": "4dc3f1233d103e6dd4c8c8734e36a460299c680f",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/cb57d41625a2e40eaa0d41da157d3819a92fbd18"
+        },
+        "date": 1702463962831,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 13253882,
+            "range": "± 137866",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 13145115,
+            "range": "± 157883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 8491776,
+            "range": "± 105340",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 8499466,
+            "range": "± 85440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 1647602841,
+            "range": "± 1807368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 1982988583,
+            "range": "± 2553520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 1992032727,
+            "range": "± 5919075",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 2360571247,
+            "range": "± 7508954",
             "unit": "ns/iter"
           }
         ]
