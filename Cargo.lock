@@ -422,6 +422,7 @@ dependencies = [
  "car-mirror",
  "criterion",
  "libipld",
+ "serde_ipld_dagcbor",
  "wnfs-common",
 ]
 
