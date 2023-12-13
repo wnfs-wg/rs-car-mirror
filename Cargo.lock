@@ -149,9 +149,9 @@ dependencies = [
 
 [[package]]
 name = "async-once-cell"
-version = "0.4.4"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b49bd4c5b769125ea6323601c39815848972880efd33ffb2d01f9f909adc699"
+checksum = "9338790e78aa95a416786ec8389546c4b6a1dfc3dc36071ed9518a9413a542eb"
 
 [[package]]
 name = "async-std"
@@ -1002,9 +1002,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-car"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a291220adb48738bdea587156c5f44ca5ec4ad31fdeb8fb88fda1dcd7886a24"
+checksum = "475a6f0ebd64c87ea011021c67f10b57930f6c286e0163807066bfb83553b1b6"
 dependencies = [
  "anyhow",
  "cid",
@@ -2275,9 +2275,9 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
 name = "wnfs-common"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfcb4584f3866ead49adae8c05cec6f633139d19283448aa7807280612e24b7"
+checksum = "0e7dd203b73bbbbbf175a8a733ef6aa843f020095f5f4d1e6cd3b7fdce8ba4d8"
 dependencies = [
  "anyhow",
  "async-once-cell",

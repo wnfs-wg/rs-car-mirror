@@ -184,14 +184,14 @@ mod proptests {
     use proptest::strategy::Strategy;
     use std::collections::BTreeSet;
     use test_strategy::proptest;
-    use wnfs_common::{dagcbor::encode, BlockStore, MemoryBlockStore};
+    use wnfs_common::{encode, BlockStore, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
         arb_ipld_dag(1..256, 0.5, |cids, _| {
             let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
             let cid = Cid::new_v1(
                 IpldCodec::DagCbor.into(),
-                Code::Blake3_256.digest(&encode(&ipld).unwrap()),
+                Code::Blake3_256.digest(&encode(&ipld, IpldCodec::DagCbor).unwrap()),
             );
             (cid, ipld)
         })
@@ -204,7 +204,7 @@ mod proptests {
             let store = &MemoryBlockStore::new();
 
             for (cid, ipld) in dag.iter() {
-                let block: Bytes = encode(ipld).unwrap().into();
+                let block: Bytes = encode(ipld, IpldCodec::DagCbor).unwrap().into();
                 let cid_store = store
                     .put_block(block, IpldCodec::DagCbor.into())
                     .await
