@@ -2,6 +2,7 @@ use car_mirror::{
     common::Config,
     pull, push,
     test_utils::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore},
+    traits::InMemoryCache,
 };
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::{ops::Range, time::Duration};
@@ -67,23 +68,30 @@ pub fn pull_with_simulated_latency(
                     links_to_padded_ipld(block_padding),
                 ));
                 let store = async_std::task::block_on(setup_blockstore(blocks)).unwrap();
-                (store, root)
+                let cache = InMemoryCache::new(10_000);
+                (store, cache, root)
             },
-            |(ref server_store, root)| {
+            |(ref server_store, ref server_cache, root)| {
                 let client_store = &MemoryBlockStore::new();
+                let client_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
                 async_std::task::block_on(async move {
-                    let mut request = pull::request(root, None, config, client_store).await?;
+                    let mut request =
+                        pull::request(root, None, config, client_store, client_cache).await?;
                     loop {
                         let request_bytes = serde_ipld_dagcbor::to_vec(&request)?.len();
                         simulate_upload_latency(request_bytes).await;
 
-                        let response = pull::response(root, request, config, server_store).await?;
+                        let response =
+                            pull::response(root, request, config, server_store, server_cache)
+                                .await?;
                         simulate_download_latency(response.bytes.len()).await;
 
-                        request = pull::request(root, Some(response), config, client_store).await?;
+                        request =
+                            pull::request(root, Some(response), config, client_store, client_cache)
+                                .await?;
 
                         if request.indicates_finished() {
                             break;
@@ -137,26 +145,33 @@ pub fn push_with_simulated_latency(
                     links_to_padded_ipld(block_padding),
                 ));
                 let store = async_std::task::block_on(setup_blockstore(blocks)).unwrap();
-                (store, root)
+                let cache = InMemoryCache::new(10_000);
+                (store, cache, root)
             },
-            |(ref client_store, root)| {
+            |(ref client_store, ref client_cache, root)| {
                 let server_store = &MemoryBlockStore::new();
+                let server_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
                 async_std::task::block_on(async move {
-                    let mut request = push::request(root, None, config, client_store).await?;
+                    let mut request =
+                        push::request(root, None, config, client_store, client_cache).await?;
                     loop {
                         simulate_upload_latency(request.bytes.len()).await;
 
-                        let response = push::response(root, request, config, server_store).await?;
+                        let response =
+                            push::response(root, request, config, server_store, server_cache)
+                                .await?;
                         let response_bytes = serde_ipld_dagcbor::to_vec(&response)?.len();
                         simulate_download_latency(response_bytes).await;
 
                         if response.indicates_finished() {
                             break;
                         }
-                        request = push::request(root, Some(response), config, client_store).await?;
+                        request =
+                            push::request(root, Some(response), config, client_store, client_cache)
+                                .await?;
                     }
 
                     Ok::<(), anyhow::Error>(())
