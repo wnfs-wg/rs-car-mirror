@@ -16,6 +16,7 @@ use crate::{
     error::Error,
     incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{Bloom, PullRequest, PushResponse},
+    traits::Cache,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -67,12 +68,13 @@ pub struct CarFile {
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip(config, store))]
+#[instrument(skip(config, store, cache))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<CarFile, Error> {
     let ReceiverState {
         ref missing_subgraph_roots,
@@ -83,39 +85,10 @@ pub async fn block_send(
     });
 
     // Verify that all missing subgraph roots are in the relevant DAG:
-    let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
-        .stream(store)
-        .try_filter_map(|(cid, _)| async move {
-            Ok(missing_subgraph_roots.contains(&cid).then_some(cid))
-        })
-        .try_collect()
-        .await?;
+    let subgraph_roots =
+        verify_missing_subgraph_roots(root, missing_subgraph_roots, store, cache).await?;
 
-    if subgraph_roots.len() != missing_subgraph_roots.len() {
-        let unrelated_roots = missing_subgraph_roots
-            .iter()
-            .filter(|cid| !subgraph_roots.contains(cid))
-            .map(|cid| cid.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        warn!(
-            unrelated_roots = %unrelated_roots,
-            "got asked for DAG-unrelated blocks"
-        );
-    }
-
-    if let Some(bloom) = &have_cids_bloom {
-        debug!(
-            size_bits = bloom.as_bytes().len() * 8,
-            hash_count = bloom.hash_count(),
-            ones_count = bloom.count_ones(),
-            estimated_fpr = bloom.current_false_positive_rate(),
-            "received 'have cids' bloom",
-        );
-    }
-
-    let bloom = have_cids_bloom.unwrap_or_else(|| BloomFilter::new_with(1, Box::new([0]))); // An empty bloom that contains nothing
+    let bloom = handle_missing_bloom(have_cids_bloom);
 
     let mut writer = CarWriter::new(
         CarHeader::new_v1(
@@ -136,38 +109,15 @@ pub async fn block_send(
         .await
         .map_err(|e| Error::CarFileError(anyhow!(e)))?;
 
-    let mut block_bytes = 0;
-    let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
-    while let Some((cid, block)) = dag_walk.next(store).await? {
-        if bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(&cid) {
-            debug!(
-                cid = %cid,
-                bloom_contains = bloom.contains(&cid.to_bytes()),
-                subgraph_roots_contains = subgraph_roots.contains(&cid),
-                "skipped writing block"
-            );
-            continue;
-        }
-
-        debug!(
-            cid = %cid,
-            num_bytes = block.len(),
-            frontier_size = dag_walk.frontier.len(),
-            "writing block to CAR",
-        );
-
-        writer
-            .write(cid, &block)
-            .await
-            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
-
-        // TODO(matheus23): Count the actual bytes sent?
-        // At the moment, this is a rough estimate. iroh-car could be improved to return the written bytes.
-        block_bytes += block.len();
-        if block_bytes > config.send_minimum {
-            break;
-        }
-    }
+    write_blocks_into_car(
+        &mut writer,
+        subgraph_roots,
+        &bloom,
+        config.send_minimum,
+        store,
+        cache,
+    )
+    .await?;
 
     Ok(CarFile {
         bytes: writer
@@ -186,58 +136,29 @@ pub async fn block_send(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip(last_car, config, store), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[instrument(skip(last_car, config, store, cache), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<ReceiverState, Error> {
-    let mut dag_verification = IncrementalDagVerification::new([root], store).await?;
+    let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
 
     if let Some(car) = last_car {
         let mut reader = CarReader::new(Cursor::new(car.bytes))
             .await
             .map_err(|e| Error::CarFileError(anyhow!(e)))?;
-        let mut block_bytes = 0;
 
-        while let Some((cid, vec)) = reader
-            .next_block()
-            .await
-            .map_err(|e| Error::CarFileError(anyhow!(e)))?
-        {
-            let block = Bytes::from(vec);
-
-            debug!(
-                cid = %cid,
-                num_bytes = block.len(),
-                "reading block from CAR",
-            );
-
-            block_bytes += block.len();
-            if block_bytes > config.receive_maximum {
-                return Err(Error::TooManyBytes {
-                    block_bytes,
-                    receive_maximum: config.receive_maximum,
-                });
-            }
-
-            match dag_verification.block_state(cid) {
-                BlockState::Have => continue,
-                BlockState::Unexpected => {
-                    trace!(
-                        cid = %cid,
-                        "received block out of order (possibly due to bloom false positive)"
-                    );
-                    break;
-                }
-                BlockState::Want => {
-                    dag_verification
-                        .verify_and_store_block((cid, block), store)
-                        .await?;
-                }
-            }
-        }
+        read_and_verify_blocks(
+            &mut dag_verification,
+            &mut reader,
+            config.receive_maximum,
+            store,
+            cache,
+        )
+        .await?;
     }
 
     let missing_subgraph_roots = dag_verification
@@ -296,15 +217,162 @@ pub fn references<E: Extend<Cid>>(
     cid: Cid,
     block: impl AsRef<[u8]>,
     mut refs: E,
-) -> Result<E, Error> {
+) -> Result<E, anyhow::Error> {
     let codec: IpldCodec = cid
         .codec()
         .try_into()
         .map_err(|_| Error::UnsupportedCodec { cid })?;
 
-    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)
-        .map_err(Error::ParsingError)?;
+    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
     Ok(refs)
+}
+
+//--------------------------------------------------------------------------------------------------
+// Private Functions
+//--------------------------------------------------------------------------------------------------
+
+async fn verify_missing_subgraph_roots(
+    root: Cid,
+    missing_subgraph_roots: &Vec<Cid>,
+    store: &impl BlockStore,
+    cache: &impl Cache,
+) -> Result<Vec<Cid>, Error> {
+    let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
+        .stream(store, cache)
+        .try_filter_map(
+            |cid| async move { Ok(missing_subgraph_roots.contains(&cid).then_some(cid)) },
+        )
+        .try_collect()
+        .await?;
+
+    if subgraph_roots.len() != missing_subgraph_roots.len() {
+        let unrelated_roots = missing_subgraph_roots
+            .iter()
+            .filter(|cid| !subgraph_roots.contains(cid))
+            .map(|cid| cid.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        warn!(
+            unrelated_roots = %unrelated_roots,
+            "got asked for DAG-unrelated blocks"
+        );
+    }
+
+    Ok(subgraph_roots)
+}
+
+fn handle_missing_bloom(have_cids_bloom: Option<BloomFilter>) -> BloomFilter {
+    if let Some(bloom) = &have_cids_bloom {
+        debug!(
+            size_bits = bloom.as_bytes().len() * 8,
+            hash_count = bloom.hash_count(),
+            ones_count = bloom.count_ones(),
+            estimated_fpr = bloom.current_false_positive_rate(),
+            "received 'have cids' bloom",
+        );
+    }
+
+    have_cids_bloom.unwrap_or_else(|| BloomFilter::new_with(1, Box::new([0]))) // An empty bloom that contains nothing
+}
+
+async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
+    writer: &mut CarWriter<W>,
+    subgraph_roots: Vec<Cid>,
+    bloom: &BloomFilter,
+    send_minimum: usize,
+    store: &impl BlockStore,
+    cache: &impl Cache,
+) -> Result<(), Error> {
+    let mut block_bytes = 0;
+    let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
+
+    while let Some(cid) = dag_walk.next(store, cache).await? {
+        let block = store
+            .get_block(&cid)
+            .await
+            .map_err(Error::BlockStoreError)?;
+
+        if bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(&cid) {
+            debug!(
+                cid = %cid,
+                bloom_contains = bloom.contains(&cid.to_bytes()),
+                subgraph_roots_contains = subgraph_roots.contains(&cid),
+                "skipped writing block"
+            );
+            continue;
+        }
+
+        debug!(
+            cid = %cid,
+            num_bytes = block.len(),
+            frontier_size = dag_walk.frontier.len(),
+            "writing block to CAR",
+        );
+
+        writer
+            .write(cid, &block)
+            .await
+            .map_err(|e| Error::CarFileError(anyhow!(e)))?;
+
+        // TODO(matheus23): Count the actual bytes sent?
+        // At the moment, this is a rough estimate. iroh-car could be improved to return the written bytes.
+        block_bytes += block.len();
+        if block_bytes > send_minimum {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
+    dag_verification: &mut IncrementalDagVerification,
+    reader: &mut CarReader<R>,
+    receive_maximum: usize,
+    store: &impl BlockStore,
+    cache: &impl Cache,
+) -> Result<(), Error> {
+    let mut block_bytes = 0;
+    while let Some((cid, vec)) = reader
+        .next_block()
+        .await
+        .map_err(|e| Error::CarFileError(anyhow!(e)))?
+    {
+        let block = Bytes::from(vec);
+
+        debug!(
+            cid = %cid,
+            num_bytes = block.len(),
+            "reading block from CAR",
+        );
+
+        block_bytes += block.len();
+        if block_bytes > receive_maximum {
+            return Err(Error::TooManyBytes {
+                block_bytes,
+                receive_maximum,
+            });
+        }
+
+        match dag_verification.block_state(cid) {
+            BlockState::Have => continue,
+            BlockState::Unexpected => {
+                trace!(
+                    cid = %cid,
+                    "received block out of order (possibly due to bloom false positive)"
+                );
+                break;
+            }
+            BlockState::Want => {
+                dag_verification
+                    .verify_and_store_block((cid, block), store, cache)
+                    .await?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 //--------------------------------------------------------------------------------------------------

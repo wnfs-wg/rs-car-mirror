@@ -2,6 +2,7 @@ use crate::{
     common::{block_receive, block_send, CarFile, Config, ReceiverState},
     error::Error,
     messages::PullRequest,
+    traits::Cache,
 };
 use libipld::Cid;
 use wnfs_common::BlockStore;
@@ -22,8 +23,9 @@ pub async fn request(
     last_response: Option<CarFile>,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<PullRequest, Error> {
-    Ok(block_receive(root, last_response, config, store)
+    Ok(block_receive(root, last_response, config, store, cache)
         .await?
         .into())
 }
@@ -34,9 +36,10 @@ pub async fn response(
     request: PullRequest,
     config: &Config,
     store: &impl BlockStore,
+    cache: &impl Cache,
 ) -> Result<CarFile, Error> {
     let receiver_state = Some(ReceiverState::from(request));
-    block_send(root, receiver_state, config, store).await
+    block_send(root, receiver_state, config, store, cache).await
 }
 
 #[cfg(test)]
@@ -45,6 +48,7 @@ mod tests {
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_random_dag, Metrics},
+        traits::NoCache,
     };
     use anyhow::Result;
     use futures::TryStreamExt;
@@ -59,10 +63,11 @@ mod tests {
         server_store: &MemoryBlockStore,
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
-        let mut request = crate::pull::request(root, None, config, client_store).await?;
+        let mut request = crate::pull::request(root, None, config, client_store, &NoCache).await?;
         loop {
             let request_bytes = serde_ipld_dagcbor::to_vec(&request)?.len();
-            let response = crate::pull::response(root, request, config, server_store).await?;
+            let response =
+                crate::pull::response(root, request, config, server_store, &NoCache).await?;
             let response_bytes = response.bytes.len();
 
             metrics.push(Metrics {
@@ -70,7 +75,8 @@ mod tests {
                 response_bytes,
             });
 
-            request = crate::pull::request(root, Some(response), config, client_store).await?;
+            request =
+                crate::pull::request(root, Some(response), config, client_store, &NoCache).await?;
             if request.indicates_finished() {
                 break;
             }
@@ -88,13 +94,11 @@ mod tests {
 
         // client should have all data
         let client_cids = DagWalk::breadth_first([root])
-            .stream(client_store)
-            .map_ok(|(cid, _)| cid)
+            .stream(client_store, &NoCache)
             .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
-            .stream(server_store)
-            .map_ok(|(cid, _)| cid)
+            .stream(server_store, &NoCache)
             .try_collect::<HashSet<_>>()
             .await?;
 
@@ -110,6 +114,7 @@ mod proptests {
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_blockstore, variable_blocksize_dag},
+        traits::NoCache,
     };
     use futures::TryStreamExt;
     use libipld::{Cid, Ipld};
@@ -135,14 +140,12 @@ mod proptests {
 
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
-                .stream(client_store)
-                .map_ok(|(cid, _)| cid)
+                .stream(client_store, &NoCache)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
-                .stream(server_store)
-                .map_ok(|(cid, _)| cid)
+                .stream(server_store, &NoCache)
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();

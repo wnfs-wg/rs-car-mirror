@@ -23,3 +23,5 @@ pub mod messages;
 pub mod pull;
 /// The CAR mirror push protocol. Meant to be used qualified, i.e. `push::request` and `push::response`
 pub mod push;
+/// Traits defined in this crate
+pub mod traits;
