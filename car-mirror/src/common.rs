@@ -221,7 +221,7 @@ pub fn references<E: Extend<Cid>>(
 
 async fn verify_missing_subgraph_roots(
     root: Cid,
-    missing_subgraph_roots: &Vec<Cid>,
+    missing_subgraph_roots: &[Cid],
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<Vec<Cid>, Error> {
