@@ -91,3 +91,5 @@ pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Resu
         .await?
         .len())
 }
+
+pub(crate) fn assert_send_sync<T: Send + Sync>(fut: fn() -> T) {}

@@ -450,3 +450,31 @@ impl Default for Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::assert_send_sync;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn send_sync_tests() {
+        assert_send_sync(|| {
+            block_send(
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+            )
+        });
+        assert_send_sync(|| {
+            block_receive(
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+            )
+        })
+    }
+}

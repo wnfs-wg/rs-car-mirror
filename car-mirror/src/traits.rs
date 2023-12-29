@@ -2,7 +2,7 @@ use crate::common::references;
 use anyhow::Result;
 use async_trait::async_trait;
 use libipld::{Cid, IpldCodec};
-use wnfs_common::BlockStore;
+use wnfs_common::{utils::CondSync, BlockStore};
 
 /// This trait abstracts caches used by the car mirror implementation.
 /// An efficient cache implementation can significantly reduce the amount
@@ -13,8 +13,9 @@ use wnfs_common::BlockStore;
 ///
 /// See `InMemoryCache` for a `quick_cache`-based implementation
 /// (enable the `quick-cache` feature), and `NoCache` for disabling the cache.
-#[async_trait(?Send)]
-pub trait Cache {
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+pub trait Cache: CondSync {
     /// This returns further references from the block referenced by given CID,
     /// if the cache is hit.
     /// Returns `None` if it's a cache miss.
@@ -85,7 +86,8 @@ impl InMemoryCache {
 }
 
 #[cfg(feature = "quick_cache")]
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Cache for InMemoryCache {
     async fn get_references_cached(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
         Ok(self.references.get(&cid))
@@ -101,7 +103,8 @@ impl Cache for InMemoryCache {
 #[derive(Debug)]
 pub struct NoCache;
 
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Cache for NoCache {
     async fn get_references_cached(&self, _: Cid) -> Result<Option<Vec<Cid>>> {
         Ok(None)
