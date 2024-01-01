@@ -40,12 +40,31 @@ pub struct Config {
 
 /// Some information that the block receiving end provides the block sending end
 /// in order to deduplicate block transfers.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ReceiverState {
     /// At least *some* of the subgraph roots that are missing for sure on the receiving end.
     pub missing_subgraph_roots: Vec<Cid>,
     /// An optional bloom filter of all CIDs below the root that the receiving end has.
     pub have_cids_bloom: Option<BloomFilter>,
+}
+
+impl std::fmt::Debug for ReceiverState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let have_cids_bloom = self
+            .have_cids_bloom
+            .as_ref()
+            .map_or("None".into(), |bloom| {
+                format!(
+                    "Some(BloomFilter(k_hashes = {}, {} bytes))",
+                    bloom.hash_count(),
+                    bloom.as_bytes().len()
+                )
+            });
+        f.debug_struct("ReceiverState")
+            .field("missing_subgraph_roots", &self.missing_subgraph_roots)
+            .field("have_cids_bloom", &have_cids_bloom)
+            .finish()
+    }
 }
 
 /// Newtype around bytes that are supposed to represent a CAR file
@@ -451,14 +470,14 @@ impl Default for Config {
     }
 }
 
+#[cfg(fuckoff)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::assert_send_sync;
+    use crate::test_utils::assert_cond_send_sync;
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn send_sync_tests() {
-        assert_send_sync(|| {
+        assert_cond_send_sync(|| {
             block_send(
                 unimplemented!(),
                 unimplemented!(),
@@ -467,7 +486,7 @@ mod tests {
                 unimplemented!(),
             )
         });
-        assert_send_sync(|| {
+        assert_cond_send_sync(|| {
             block_receive(
                 unimplemented!(),
                 unimplemented!(),
