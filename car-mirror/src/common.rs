@@ -472,17 +472,20 @@ impl Default for Config {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_utils::assert_cond_send_sync;
+    use wnfs_common::MemoryBlockStore;
 
-    fn send_sync_tests() {
+    use super::*;
+    use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+
+    #[allow(clippy::unreachable, unused)]
+    fn test_assert_send() {
         assert_cond_send_sync(|| {
             block_send(
                 unimplemented!(),
                 unimplemented!(),
                 unimplemented!(),
-                unimplemented!(),
-                unimplemented!(),
+                unimplemented!() as &MemoryBlockStore,
+                &NoCache,
             )
         });
         assert_cond_send_sync(|| {
@@ -490,8 +493,8 @@ mod tests {
                 unimplemented!(),
                 unimplemented!(),
                 unimplemented!(),
-                unimplemented!(),
-                unimplemented!(),
+                unimplemented!() as &MemoryBlockStore,
+                &NoCache,
             )
         })
     }
