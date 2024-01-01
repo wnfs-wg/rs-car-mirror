@@ -54,8 +54,11 @@ impl IncrementalDagVerification {
         Ok(this)
     }
 
+    /// Updates the state of incremental dag verification.
+    /// This goes through all "want" blocks and what they link to,
+    /// removing items that we now have and don't want anymore.
     #[instrument(level = "trace", skip_all)]
-    async fn update_have_cids(
+    pub async fn update_have_cids(
         &mut self,
         store: &impl BlockStore,
         cache: &impl Cache,
@@ -69,15 +72,24 @@ impl IncrementalDagVerification {
                         e.downcast_ref::<BlockStoreError>()
                     {
                         tracing::trace!(%not_found, "Missing block, adding to want list");
-                        self.want_cids.insert(*not_found);
+                        self.mark_as_want(*not_found);
                     } else {
                         return Err(Error::BlockStoreError(e));
                     }
                 }
                 Err(e) => return Err(e),
                 Ok(Some(cid)) => {
-                    self.want_cids.remove(&cid);
-                    self.have_cids.insert(cid);
+                    let not_found = matches!(
+                        store.get_block(&cid).await,
+                        Err(e) if matches!(e.downcast_ref(), Some(BlockStoreError::CIDNotFound(_)))
+                    );
+
+                    if not_found {
+                        tracing::trace!(%cid, "Missing block, adding to want list");
+                        self.mark_as_want(cid);
+                    } else {
+                        self.mark_as_have(cid);
+                    }
                 }
                 Ok(None) => {
                     break;
@@ -92,6 +104,19 @@ impl IncrementalDagVerification {
         );
 
         Ok(())
+    }
+
+    fn mark_as_want(&mut self, want: Cid) {
+        if self.have_cids.contains(&want) {
+            tracing::warn!(%want, "Marking a CID as wanted, that we have previously marked as having!");
+            self.have_cids.remove(&want);
+        }
+        self.want_cids.insert(want);
+    }
+
+    fn mark_as_have(&mut self, have: Cid) {
+        self.want_cids.remove(&have);
+        self.have_cids.insert(have);
     }
 
     /// Check the state of a CID to find out whether
