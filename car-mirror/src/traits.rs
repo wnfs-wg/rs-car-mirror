@@ -2,14 +2,17 @@ use crate::common::references;
 use anyhow::Result;
 use async_trait::async_trait;
 use libipld::{Cid, IpldCodec};
-use wnfs_common::{utils::CondSync, BlockStore};
+use wnfs_common::{
+    utils::{Arc, CondSync},
+    BlockStore, BlockStoreError,
+};
 
 /// This trait abstracts caches used by the car mirror implementation.
 /// An efficient cache implementation can significantly reduce the amount
 /// of lookups into the blockstore.
 ///
-/// At the moment, all caches are conceptually memoization tables, so you don't
-/// necessarily need to think about being careful about cache eviction.
+/// At the moment, all caches are either memoization tables or informationally
+/// monotonous, so you don't need to be careful about cache eviction.
 ///
 /// See `InMemoryCache` for a `quick_cache`-based implementation
 /// (enable the `quick-cache` feature), and `NoCache` for disabling the cache.
@@ -21,10 +24,23 @@ pub trait Cache: CondSync {
     /// Returns `None` if it's a cache miss.
     ///
     /// This isn't meant to be called directly, instead use `Cache::references`.
-    async fn get_references_cached(&self, cid: Cid) -> Result<Option<Vec<Cid>>>;
+    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>>;
 
     /// Populates the references cache for given CID with given references.
-    async fn put_references_cached(&self, cid: Cid, references: Vec<Cid>) -> Result<()>;
+    async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()>;
+
+    /// This returns whether the cache has the fact stored that a block with given
+    /// CID is stored.
+    ///
+    /// This only returns `true` in case the block has been stored.
+    /// `false` simply indicates that the cache doesn't know whether the block is
+    /// stored or not (it's always a cache miss).
+    ///
+    /// Don't call this directly, instead, use `Cache::has_block`.
+    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool>;
+
+    /// This populates the cache with the fact that a block with given CID is stored.
+    async fn put_has_block_cache(&self, cid: Cid) -> Result<()>;
 
     /// Find out any CIDs that are linked to from the block with given CID.
     ///
@@ -38,14 +54,42 @@ pub trait Cache: CondSync {
             return Ok(Vec::new());
         }
 
-        if let Some(refs) = self.get_references_cached(cid).await? {
+        if let Some(refs) = self.get_references_cache(cid).await? {
             return Ok(refs);
         }
 
         let block = store.get_block(&cid).await?;
         let refs = references(cid, block, Vec::new())?;
-        self.put_references_cached(cid, refs.clone()).await?;
+        self.put_references_cache(cid, refs.clone()).await?;
         Ok(refs)
+    }
+
+    /// Find out whether a given block is stored in given blockstore or not.
+    ///
+    /// This cache is *only* effective on `true` values for `has_block`.
+    /// Repeatedly calling `has_block` with `Cid`s of blocks that are *not*
+    /// stored will cause repeated calls to given blockstore.
+    ///
+    /// **Make sure to always use the same `BlockStore` when calling this function.**
+    ///
+    /// This makes use of the caches `get_has_block_cached`, if possible.
+    /// On cache misses, this will actually fetch the block from the store
+    /// and if successful, populate the cache using `put_has_block_cached`.
+    async fn has_block(&self, cid: Cid, store: &impl BlockStore) -> Result<bool> {
+        if self.get_has_block_cache(&cid).await? {
+            return Ok(true);
+        }
+
+        match store.get_block(&cid).await {
+            Ok(_) => {
+                self.put_has_block_cache(cid).await?;
+                Ok(true)
+            }
+            Err(e) if matches!(e.downcast_ref(), Some(BlockStoreError::CIDNotFound(_))) => {
+                Ok(false)
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -53,17 +97,20 @@ pub trait Cache: CondSync {
 ///
 /// [quick-cache]: https://github.com/arthurprs/quick-cache/
 #[cfg(feature = "quick_cache")]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InMemoryCache {
-    references: quick_cache::sync::Cache<Cid, Vec<Cid>>,
+    references: Arc<quick_cache::sync::Cache<Cid, Vec<Cid>>>,
+    has_blocks: Arc<quick_cache::sync::Cache<Cid, ()>>,
 }
 
 #[cfg(feature = "quick_cache")]
 impl InMemoryCache {
     /// Create a new in-memory cache that approximately holds
-    /// cached references for `approx_capacity` CIDs.
+    /// cached references for `approx_references_capacity` CIDs
+    /// and `approx_has_blocks_capacity` CIDs known to be stored locally.
     ///
-    /// Computing the expected memory requirements isn't easy.
+    /// Computing the expected memory requirements for the reference
+    /// cache isn't easy.
     /// A block in theory have up to thousands of references.
     /// [UnixFS] chunked files will reference up to 174 chunks
     /// at a time.
@@ -77,10 +124,15 @@ impl InMemoryCache {
     ///
     /// In practice, the fanout average will be much lower than 174.
     ///
+    /// On the other hand, each cache entry for the `has_blocks` cache
+    /// will take a little more than 64 bytes, so for a 10MB
+    /// `has_blocks` cache, you would use `10MB / 64bytes = 156_250`.
+    ///
     /// [UnixFS]: https://github.com/ipfs/specs/blob/main/UNIXFS.md#layout
-    pub fn new(approx_capacity: usize) -> Self {
+    pub fn new(approx_references_capacity: usize, approx_has_blocks_capacity: usize) -> Self {
         Self {
-            references: quick_cache::sync::Cache::new(approx_capacity),
+            references: Arc::new(quick_cache::sync::Cache::new(approx_references_capacity)),
+            has_blocks: Arc::new(quick_cache::sync::Cache::new(approx_has_blocks_capacity)),
         }
     }
 }
@@ -89,12 +141,21 @@ impl InMemoryCache {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Cache for InMemoryCache {
-    async fn get_references_cached(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
         Ok(self.references.get(&cid))
     }
 
-    async fn put_references_cached(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+    async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
         self.references.insert(cid, references);
+        Ok(())
+    }
+
+    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
+        Ok(self.has_blocks.get(cid).is_some())
+    }
+
+    async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
+        self.has_blocks.insert(cid, ());
         Ok(())
     }
 }
@@ -106,11 +167,19 @@ pub struct NoCache;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Cache for NoCache {
-    async fn get_references_cached(&self, _: Cid) -> Result<Option<Vec<Cid>>> {
+    async fn get_references_cache(&self, _: Cid) -> Result<Option<Vec<Cid>>> {
         Ok(None)
     }
 
-    async fn put_references_cached(&self, _: Cid, _: Vec<Cid>) -> Result<()> {
+    async fn put_references_cache(&self, _: Cid, _: Vec<Cid>) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_has_block_cache(&self, _: &Cid) -> Result<bool> {
+        Ok(false)
+    }
+
+    async fn put_has_block_cache(&self, _: Cid) -> Result<()> {
         Ok(())
     }
 }

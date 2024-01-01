@@ -61,7 +61,10 @@ impl std::fmt::Debug for ReceiverState {
                 )
             });
         f.debug_struct("ReceiverState")
-            .field("missing_subgraph_roots", &self.missing_subgraph_roots)
+            .field(
+                "missing_subgraph_roots.len() == ",
+                &self.missing_subgraph_roots.len(),
+            )
             .field("have_cids_bloom", &have_cids_bloom)
             .finish()
     }
@@ -86,7 +89,7 @@ pub struct CarFile {
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip(config, store, cache))]
+#[instrument(skip_all, fields(root, last_state))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -145,7 +148,7 @@ pub async fn block_send(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip(last_car, config, store, cache), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,

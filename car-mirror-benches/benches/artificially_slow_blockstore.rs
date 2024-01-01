@@ -28,9 +28,9 @@ pub fn push_throttled(c: &mut Criterion) {
             },
             |(client_store, root)| {
                 let client_store = &ThrottledBlockStore(client_store);
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let server_store = &ThrottledBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -75,9 +75,9 @@ pub fn pull_throttled(c: &mut Criterion) {
             },
             |(server_store, root)| {
                 let server_store = &ThrottledBlockStore(server_store);
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let client_store = &ThrottledBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
