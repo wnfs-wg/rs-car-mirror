@@ -470,7 +470,6 @@ impl Default for Config {
     }
 }
 
-#[cfg(fuckoff)]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -54,7 +54,7 @@ impl IncrementalDagVerification {
         Ok(this)
     }
 
-    #[instrument(level = "trace", skip_all, fields(num_want = self.want_cids.len(), num_have = self.have_cids.len()))]
+    #[instrument(level = "trace", skip_all)]
     async fn update_have_cids(
         &mut self,
         store: &impl BlockStore,
@@ -68,6 +68,7 @@ impl IncrementalDagVerification {
                     if let Some(BlockStoreError::CIDNotFound(not_found)) =
                         e.downcast_ref::<BlockStoreError>()
                     {
+                        tracing::trace!(%not_found, "Missing block, adding to want list");
                         self.want_cids.insert(*not_found);
                     } else {
                         return Err(Error::BlockStoreError(e));
@@ -83,6 +84,12 @@ impl IncrementalDagVerification {
                 }
             }
         }
+
+        tracing::debug!(
+            num_want = self.want_cids.len(),
+            num_have = self.have_cids.len(),
+            "Finished dag verification"
+        );
 
         Ok(())
     }
