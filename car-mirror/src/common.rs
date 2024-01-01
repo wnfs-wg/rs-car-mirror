@@ -472,10 +472,9 @@ impl Default for Config {
 
 #[cfg(test)]
 mod tests {
-    use wnfs_common::MemoryBlockStore;
-
     use super::*;
     use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+    use wnfs_common::MemoryBlockStore;
 
     #[allow(clippy::unreachable, unused)]
     fn test_assert_send() {

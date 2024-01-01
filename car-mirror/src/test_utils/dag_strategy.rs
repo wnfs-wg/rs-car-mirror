@@ -1,7 +1,11 @@
 use bytes::Bytes;
 use libipld::{Cid, Ipld, IpldCodec};
 use libipld_core::multihash::{Code, MultihashDigest};
-use proptest::{prelude::Rng, strategy::Strategy, test_runner::TestRng};
+use proptest::{
+    prelude::{Rng, RngCore},
+    strategy::Strategy,
+    test_runner::TestRng,
+};
 use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -46,20 +50,28 @@ pub fn links_to_padded_ipld(
     padding_bytes: usize,
 ) -> impl Fn(Vec<Cid>, &mut TestRng) -> (Cid, Ipld) + Clone {
     move |cids, rng| {
-        let mut padding = Vec::with_capacity(padding_bytes);
-        for _ in 0..padding_bytes {
-            padding.push(rng.gen::<u8>());
-        }
+        let mut padding = vec![0u8; padding_bytes];
+        rng.fill_bytes(&mut padding);
 
-        let ipld = Ipld::Map(BTreeMap::from([
-            ("data".into(), Ipld::Bytes(padding)),
-            (
-                "links".into(),
-                Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
-            ),
-        ]));
-        let bytes = encode(&ipld, IpldCodec::DagCbor).unwrap();
-        let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
+        let codec = match rng.gen_bool(0.5) {
+            true if cids.is_empty() => IpldCodec::Raw,
+            _ => IpldCodec::DagCbor,
+        };
+
+        let ipld = if cids.is_empty() && codec == IpldCodec::Raw {
+            Ipld::Bytes(padding)
+        } else {
+            Ipld::Map(BTreeMap::from([
+                ("data".into(), Ipld::Bytes(padding)),
+                (
+                    "links".into(),
+                    Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
+                ),
+            ]))
+        };
+
+        let bytes = encode(&ipld, codec).unwrap();
+        let cid = Cid::new_v1(codec.into(), Code::Blake3_256.digest(&bytes));
         (cid, ipld)
     }
 }
