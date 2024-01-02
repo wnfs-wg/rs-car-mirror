@@ -252,9 +252,99 @@ mod quick_cache_tests {
 #[cfg(test)]
 mod tests {
     use super::{Cache, NoCache};
-    use libipld::{Ipld, IpldCodec};
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use libipld::{Cid, Ipld, IpldCodec};
+    use std::{
+        collections::{HashMap, HashSet},
+        sync::RwLock,
+    };
     use testresult::TestResult;
     use wnfs_common::{BlockStore, MemoryBlockStore};
+
+    #[derive(Debug, Default)]
+    struct HashMapCache {
+        references: RwLock<HashMap<Cid, Vec<Cid>>>,
+        has_blocks: RwLock<HashSet<Cid>>,
+    }
+
+    #[async_trait]
+    impl Cache for HashMapCache {
+        async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+            Ok(self.references.read().unwrap().get(&cid).cloned())
+        }
+
+        async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+            self.references.write().unwrap().insert(cid, references);
+            Ok(())
+        }
+
+        async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
+            Ok(self.has_blocks.read().unwrap().contains(cid))
+        }
+
+        async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
+            self.has_blocks.write().unwrap().insert(cid);
+            Ok(())
+        }
+    }
+
+    #[async_std::test]
+    async fn test_has_block_cache() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = HashMapCache::default();
+
+        let cid = store
+            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
+            .await?;
+
+        // Initially, the cache is unpopulated
+        assert!(!cache.get_has_block_cache(&cid).await?);
+
+        // Then, we populate that cache
+        assert!(cache.has_block(cid, store).await?);
+
+        // Now, the cache should be populated
+        assert!(cache.get_has_block_cache(&cid).await?);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_references_cache() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = HashMapCache::default();
+
+        let hello_one_cid = store
+            .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let hello_two_cid = store
+            .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let cid = store
+            .put_serializable(&Ipld::List(vec![
+                Ipld::Link(hello_one_cid),
+                Ipld::Link(hello_two_cid),
+            ]))
+            .await?;
+
+        // Cache unpopulated initially
+        assert_eq!(cache.get_references_cache(cid).await?, None);
+
+        // This should populate the references cache
+        assert_eq!(
+            cache.references(cid, store).await?,
+            vec![hello_one_cid, hello_two_cid]
+        );
+
+        // Cache should now contain the references
+        assert_eq!(
+            cache.get_references_cache(cid).await?,
+            Some(vec![hello_one_cid, hello_two_cid])
+        );
+
+        Ok(())
+    }
 
     #[async_std::test]
     async fn test_no_cache_has_block() -> TestResult {
