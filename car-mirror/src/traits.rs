@@ -182,3 +182,68 @@ impl Cache for NoCache {
         Ok(())
     }
 }
+
+#[cfg(all(test, feature = "quick_cache"))]
+mod quick_cache_tests {
+    use super::{Cache, InMemoryCache};
+    use libipld::{Ipld, IpldCodec};
+    use testresult::TestResult;
+    use wnfs_common::{BlockStore, MemoryBlockStore};
+
+    #[async_std::test]
+    async fn test_has_block_cache() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = InMemoryCache::new(10_000, 150_000);
+
+        let cid = store
+            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
+            .await?;
+
+        // Initially, the cache is unpopulated
+        assert!(!cache.get_has_block_cache(&cid).await?);
+
+        // Then, we populate that cache
+        assert!(cache.has_block(cid, store).await?);
+
+        // Now, the cache should be populated
+        assert!(cache.get_has_block_cache(&cid).await?);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_references_cache() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = InMemoryCache::new(10_000, 150_000);
+
+        let hello_one_cid = store
+            .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let hello_two_cid = store
+            .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let cid = store
+            .put_serializable(&Ipld::List(vec![
+                Ipld::Link(hello_one_cid),
+                Ipld::Link(hello_two_cid),
+            ]))
+            .await?;
+
+        // Cache unpopulated initially
+        assert_eq!(cache.get_references_cache(cid).await?, None);
+
+        // This should populate the references cache
+        assert_eq!(
+            cache.references(cid, store).await?,
+            vec![hello_one_cid, hello_two_cid]
+        );
+
+        // Cache should now contain the references
+        assert_eq!(
+            cache.get_references_cache(cid).await?,
+            Some(vec![hello_one_cid, hello_two_cid])
+        );
+
+        Ok(())
+    }
+}

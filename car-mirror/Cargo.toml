@@ -49,6 +49,7 @@ car-mirror = { path = ".", features = ["test_utils"] }
 proptest = "1.1"
 roaring-graphs = "0.12"
 test-strategy = "0.3"
+testresult = "0.3.0"
 
 [features]
 default = []
