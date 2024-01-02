@@ -247,3 +247,70 @@ mod quick_cache_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Cache, NoCache};
+    use libipld::{Ipld, IpldCodec};
+    use testresult::TestResult;
+    use wnfs_common::{BlockStore, MemoryBlockStore};
+
+    #[async_std::test]
+    async fn test_no_cache_has_block() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = NoCache;
+
+        let cid = store
+            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
+            .await?;
+
+        let not_stored_cid = store.create_cid(b"Hi!", IpldCodec::Raw.into())?;
+
+        // Cache should start out unpopulated
+        assert!(!cache.get_has_block_cache(&cid).await?);
+
+        // Then we "try to populate it".
+        assert!(cache.has_block(cid, store).await?);
+
+        // It should still give correct answers
+        assert!(!cache.has_block(not_stored_cid, store).await?);
+
+        // Still, it should stay unpopulated
+        assert!(!cache.get_has_block_cache(&cid).await?);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_no_cache_references() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let cache = NoCache;
+
+        let hello_one_cid = store
+            .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let hello_two_cid = store
+            .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
+            .await?;
+        let cid = store
+            .put_serializable(&Ipld::List(vec![
+                Ipld::Link(hello_one_cid),
+                Ipld::Link(hello_two_cid),
+            ]))
+            .await?;
+
+        // Cache should start out unpopulated
+        assert_eq!(cache.get_references_cache(cid).await?, None);
+
+        // We should get the correct answer for our queries
+        assert_eq!(
+            cache.references(cid, store).await?,
+            vec![hello_one_cid, hello_two_cid]
+        );
+
+        // We don't have a populated cache though
+        assert_eq!(cache.get_references_cache(cid).await?, None);
+
+        Ok(())
+    }
+}
