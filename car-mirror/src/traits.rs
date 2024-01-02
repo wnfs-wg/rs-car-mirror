@@ -2,10 +2,9 @@ use crate::common::references;
 use anyhow::Result;
 use async_trait::async_trait;
 use libipld::{Cid, IpldCodec};
-use wnfs_common::{
-    utils::{Arc, CondSync},
-    BlockStore, BlockStoreError,
-};
+#[cfg(feature = "quick_cache")]
+use wnfs_common::utils::Arc;
+use wnfs_common::{utils::CondSync, BlockStore, BlockStoreError};
 
 /// This trait abstracts caches used by the car mirror implementation.
 /// An efficient cache implementation can significantly reduce the amount
