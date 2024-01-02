@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1702463963456,
+  "lastUpdate": 1704193385883,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -257,6 +257,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 2360571247,
             "range": "± 7508954",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b22fb94752f065482bc6f738d0c1a8639cd46778",
+          "message": "fix: Correctly handle raw-codec CIDs/blocks (#37)\n\nMajor things in this PR:\r\n- Correctly handle raw-codec CIDs/blocks, they were previously not transferred due to a bug in `IncrementalDagVerification`.\r\n- Update wnfs-common to 0.1.26 so this crate is compatible with the latest rs-wnfs.\r\n- Introduce another cache, a positive cache for checking if we already have a block. (Work on #28)\r\n- Make sure the main request/response futures are `Send`",
+          "timestamp": "2024-01-02T11:59:01+01:00",
+          "tree_id": "c201cf323b08896d177746becbc35dd3d76288e6",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/b22fb94752f065482bc6f738d0c1a8639cd46778"
+        },
+        "date": 1704193385342,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 25083462,
+            "range": "± 316471",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 25084612,
+            "range": "± 312036",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 8811355,
+            "range": "± 203532",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 8847664,
+            "range": "± 101651",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 1647715420,
+            "range": "± 1742798",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 1982836427,
+            "range": "± 2286806",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 1991907722,
+            "range": "± 5926680",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 2360672411,
+            "range": "± 7458117",
             "unit": "ns/iter"
           }
         ]
