@@ -10,7 +10,7 @@ use car_mirror::{
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use libipld::Cid;
 use std::time::Duration;
-use wnfs_common::{BlockStore, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, MemoryBlockStore};
 
 pub fn push_throttled(c: &mut Criterion) {
     let mut rvg = car_mirror::test_utils::Rvg::deterministic();
@@ -28,9 +28,9 @@ pub fn push_throttled(c: &mut Criterion) {
             },
             |(client_store, root)| {
                 let client_store = &ThrottledBlockStore(client_store);
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let server_store = &ThrottledBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -75,9 +75,9 @@ pub fn pull_throttled(c: &mut Criterion) {
             },
             |(server_store, root)| {
                 let server_store = &ThrottledBlockStore(server_store);
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let client_store = &ThrottledBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -109,7 +109,8 @@ pub fn pull_throttled(c: &mut Criterion) {
 #[derive(Debug, Clone)]
 struct ThrottledBlockStore(MemoryBlockStore);
 
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl BlockStore for ThrottledBlockStore {
     async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
         let bytes = self.0.get_block(cid).await?;
@@ -117,7 +118,7 @@ impl BlockStore for ThrottledBlockStore {
         Ok(bytes)
     }
 
-    async fn put_block(&self, bytes: impl Into<Bytes>, codec: u64) -> Result<Cid> {
+    async fn put_block(&self, bytes: impl Into<Bytes> + CondSend, codec: u64) -> Result<Cid> {
         self.0.put_block(bytes, codec).await
     }
 }

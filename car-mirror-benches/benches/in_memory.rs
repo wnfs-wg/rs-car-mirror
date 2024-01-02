@@ -22,9 +22,9 @@ pub fn push(c: &mut Criterion) {
                 (store, root)
             },
             |(ref client_store, root)| {
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let server_store = &MemoryBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -68,9 +68,9 @@ pub fn pull(c: &mut Criterion) {
                 (store, root)
             },
             |(ref server_store, root)| {
-                let server_cache = &InMemoryCache::new(10_000);
+                let server_cache = &InMemoryCache::new(10_000, 150_000);
                 let client_store = &MemoryBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000);
+                let client_cache = &InMemoryCache::new(10_000, 150_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory

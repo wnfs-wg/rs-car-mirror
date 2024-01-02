@@ -40,7 +40,7 @@ pub struct Config {
 
 /// Some information that the block receiving end provides the block sending end
 /// in order to deduplicate block transfers.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ReceiverState {
     /// At least *some* of the subgraph roots that are missing for sure on the receiving end.
     pub missing_subgraph_roots: Vec<Cid>,
@@ -67,7 +67,7 @@ pub struct CarFile {
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip(config, store, cache))]
+#[instrument(skip_all, fields(root, last_state))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -126,7 +126,7 @@ pub async fn block_send(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip(last_car, config, store, cache), fields(car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
@@ -221,7 +221,7 @@ pub fn references<E: Extend<Cid>>(
 
 async fn verify_missing_subgraph_roots(
     root: Cid,
-    missing_subgraph_roots: &Vec<Cid>,
+    missing_subgraph_roots: &[Cid],
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<Vec<Cid>, Error> {
@@ -448,5 +448,71 @@ impl Default for Config {
             max_roots_per_round: 1000,   // max. ~41KB of CIDs
             bloom_fpr: |num_of_elems| f64::min(0.001, 0.1 / num_of_elems as f64),
         }
+    }
+}
+
+impl std::fmt::Debug for ReceiverState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let have_cids_bloom = self
+            .have_cids_bloom
+            .as_ref()
+            .map_or("None".into(), |bloom| {
+                format!(
+                    "Some(BloomFilter(k_hashes = {}, {} bytes))",
+                    bloom.hash_count(),
+                    bloom.as_bytes().len()
+                )
+            });
+        f.debug_struct("ReceiverState")
+            .field(
+                "missing_subgraph_roots.len() == ",
+                &self.missing_subgraph_roots.len(),
+            )
+            .field("have_cids_bloom", &have_cids_bloom)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+    use testresult::TestResult;
+    use wnfs_common::MemoryBlockStore;
+
+    #[allow(clippy::unreachable, unused)]
+    fn test_assert_send() {
+        assert_cond_send_sync(|| {
+            block_send(
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!() as &MemoryBlockStore,
+                &NoCache,
+            )
+        });
+        assert_cond_send_sync(|| {
+            block_receive(
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!(),
+                unimplemented!() as &MemoryBlockStore,
+                &NoCache,
+            )
+        })
+    }
+
+    #[test]
+    fn test_receiver_state_is_not_a_huge_debug() -> TestResult {
+        let state = ReceiverState {
+            have_cids_bloom: Some(BloomFilter::new_from_size(4096, 1000)),
+            missing_subgraph_roots: vec![Cid::default(); 1000],
+        };
+
+        let debug_print = format!("{state:#?}");
+
+        assert!(debug_print.len() < 1000);
+
+        Ok(())
     }
 }

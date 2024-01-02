@@ -54,13 +54,13 @@ mod tests {
     use futures::TryStreamExt;
     use libipld::Cid;
     use std::collections::HashSet;
-    use wnfs_common::MemoryBlockStore;
+    use wnfs_common::{BlockStore, MemoryBlockStore};
 
     pub(crate) async fn simulate_protocol(
         root: Cid,
         config: &Config,
-        client_store: &MemoryBlockStore,
-        server_store: &MemoryBlockStore,
+        client_store: &impl BlockStore,
+        server_store: &impl BlockStore,
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
         let mut request = crate::pull::request(root, None, config, client_store, &NoCache).await?;

@@ -5,7 +5,7 @@ use anyhow::Result;
 use futures::TryStreamExt;
 use libipld::{Cid, Ipld};
 use proptest::strategy::Strategy;
-use wnfs_common::{BlockStore, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, MemoryBlockStore};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Metrics {
@@ -91,3 +91,5 @@ pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Resu
         .await?
         .len())
 }
+
+pub(crate) fn assert_cond_send_sync<T: CondSend>(_fut: fn() -> T) {}

@@ -20,8 +20,9 @@ pub async fn setup_existing_blockstore(
     store: &impl BlockStore,
 ) -> Result<()> {
     for (cid, ipld) in blocks.into_iter() {
-        let block: Bytes = encode(&ipld, IpldCodec::DagCbor)?.into();
-        let cid_store = store.put_block(block, IpldCodec::DagCbor.into()).await?;
+        let codec: IpldCodec = cid.codec().try_into()?;
+        let block: Bytes = encode(&ipld, codec)?.into();
+        let cid_store = store.put_block(block, codec.into()).await?;
         debug_assert_eq!(cid, cid_store);
     }
 
@@ -36,7 +37,8 @@ pub fn dag_to_dot(
     writeln!(writer, "digraph {{")?;
 
     for (cid, ipld) in blocks {
-        let bytes = encode(&ipld, IpldCodec::DagCbor)?;
+        let codec: IpldCodec = cid.codec().try_into()?;
+        let bytes = encode(&ipld, codec)?;
         let refs = references(cid, bytes, Vec::new())?;
         for to_cid in refs {
             print_truncated_string(writer, cid.to_string())?;
