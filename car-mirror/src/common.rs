@@ -48,28 +48,6 @@ pub struct ReceiverState {
     pub have_cids_bloom: Option<BloomFilter>,
 }
 
-impl std::fmt::Debug for ReceiverState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let have_cids_bloom = self
-            .have_cids_bloom
-            .as_ref()
-            .map_or("None".into(), |bloom| {
-                format!(
-                    "Some(BloomFilter(k_hashes = {}, {} bytes))",
-                    bloom.hash_count(),
-                    bloom.as_bytes().len()
-                )
-            });
-        f.debug_struct("ReceiverState")
-            .field(
-                "missing_subgraph_roots.len() == ",
-                &self.missing_subgraph_roots.len(),
-            )
-            .field("have_cids_bloom", &have_cids_bloom)
-            .finish()
-    }
-}
-
 /// Newtype around bytes that are supposed to represent a CAR file
 #[derive(Debug, Clone)]
 pub struct CarFile {
@@ -473,10 +451,33 @@ impl Default for Config {
     }
 }
 
+impl std::fmt::Debug for ReceiverState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let have_cids_bloom = self
+            .have_cids_bloom
+            .as_ref()
+            .map_or("None".into(), |bloom| {
+                format!(
+                    "Some(BloomFilter(k_hashes = {}, {} bytes))",
+                    bloom.hash_count(),
+                    bloom.as_bytes().len()
+                )
+            });
+        f.debug_struct("ReceiverState")
+            .field(
+                "missing_subgraph_roots.len() == ",
+                &self.missing_subgraph_roots.len(),
+            )
+            .field("have_cids_bloom", &have_cids_bloom)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+    use testresult::TestResult;
     use wnfs_common::MemoryBlockStore;
 
     #[allow(clippy::unreachable, unused)]
@@ -499,5 +500,19 @@ mod tests {
                 &NoCache,
             )
         })
+    }
+
+    #[test]
+    fn test_receiver_state_is_not_a_huge_debug() -> TestResult {
+        let state = ReceiverState {
+            have_cids_bloom: Some(BloomFilter::new_from_size(4096, 1000)),
+            missing_subgraph_roots: vec![Cid::default(); 1000],
+        };
+
+        let debug_print = format!("{state:#?}");
+
+        assert!(debug_print.len() < 1000);
+
+        Ok(())
     }
 }
