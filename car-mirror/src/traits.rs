@@ -183,7 +183,8 @@ impl Cache for NoCache {
     }
 }
 
-#[cfg(all(test, feature = "quick_cache"))]
+#[cfg(feature = "quick_cache")]
+#[cfg(test)]
 mod quick_cache_tests {
     use super::{Cache, InMemoryCache};
     use libipld::{Ipld, IpldCodec};
