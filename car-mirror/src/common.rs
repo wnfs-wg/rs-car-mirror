@@ -198,11 +198,12 @@ pub async fn block_receive_block_stream(
 ) -> Result<ReceiverState, Error> {
     let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
 
-    while let Some(block) = stream.try_next().await? {
-        match read_and_verify_block(&mut dag_verification, block, store, cache).await? {
+    while let Some((cid, block)) = stream.try_next().await? {
+        match read_and_verify_block(&mut dag_verification, (cid, block), store, cache).await? {
             BlockState::Have => {
                 // This can happen because we've just discovered a subgraph we already have.
                 // Let's update the endpoint with our new receiver state.
+                tracing::debug!(%cid, "Received block we already have, stopping transfer");
                 break;
             }
             BlockState::Unexpected => {
@@ -212,6 +213,7 @@ pub async fn block_receive_block_stream(
                 // important for us to verify that further blocks are connected
                 // to the root.
                 // We should update the endpoint about the skipped block.
+                tracing::debug!(%cid, "Received block out of order, stopping transfer");
                 break;
             }
             BlockState::Want => {
