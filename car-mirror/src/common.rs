@@ -301,7 +301,7 @@ fn stream_blocks_from_roots<'a>(
         DagWalk::breadth_first(subgraph_roots.clone())
             .stream(store, cache)
             .try_filter(move |cid| {
-                future::ready(should_block_be_skipped(cid, &bloom, &subgraph_roots))
+                future::ready(!should_block_be_skipped(cid, &bloom, &subgraph_roots))
             })
             .and_then(move |cid| async move {
                 let bytes = store
