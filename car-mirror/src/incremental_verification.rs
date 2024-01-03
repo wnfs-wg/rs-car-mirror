@@ -1,11 +1,13 @@
 #![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
 
 use crate::{
+    common::ReceiverState,
     dag_walk::DagWalk,
     error::{Error, IncrementalVerificationError},
     traits::Cache,
 };
 use bytes::Bytes;
+use deterministic_bloom::runtime_size::BloomFilter;
 use libipld_core::{
     cid::Cid,
     multihash::{Code, MultihashDigest},
@@ -196,5 +198,48 @@ impl IncrementalDagVerification {
         self.update_have_cids(store, cache).await?;
 
         Ok(())
+    }
+
+    /// Computes the receiver state for the current incremental dag verification state.
+    /// This takes the have CIDs and turns them into
+    pub fn into_receiver_state(self, bloom_fpr: fn(u64) -> f64) -> ReceiverState {
+        let missing_subgraph_roots = self.want_cids.into_iter().collect();
+
+        let bloom_capacity = self.have_cids.len() as u64;
+
+        if bloom_capacity == 0 {
+            return ReceiverState {
+                missing_subgraph_roots,
+                have_cids_bloom: None,
+            };
+        }
+
+        if missing_subgraph_roots.is_empty() {
+            // We're done. No need to compute a bloom.
+            return ReceiverState {
+                missing_subgraph_roots,
+                have_cids_bloom: None,
+            };
+        }
+
+        let mut bloom = BloomFilter::new_from_fpr_po2(bloom_capacity, bloom_fpr(bloom_capacity));
+
+        self.have_cids
+            .into_iter()
+            .for_each(|cid| bloom.insert(&cid.to_bytes()));
+
+        tracing::debug!(
+            inserted_elements = bloom_capacity,
+            size_bits = bloom.as_bytes().len() * 8,
+            hash_count = bloom.hash_count(),
+            ones_count = bloom.count_ones(),
+            estimated_fpr = bloom.current_false_positive_rate(),
+            "built 'have cids' bloom",
+        );
+
+        ReceiverState {
+            missing_subgraph_roots,
+            have_cids_bloom: Some(bloom),
+        }
     }
 }
