@@ -64,6 +64,7 @@ mod tests {
     use libipld::Cid;
     use proptest::collection::vec;
     use std::collections::HashSet;
+    use testresult::TestResult;
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
     pub(crate) async fn simulate_protocol(
@@ -95,8 +96,8 @@ mod tests {
         Ok(metrics)
     }
 
-    #[async_std::test]
-    async fn test_transfer() -> Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn test_transfer() -> TestResult {
         let (root, ref client_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
         let server_store = &MemoryBlockStore::new();
         simulate_protocol(root, &Config::default(), client_store, server_store).await?;
@@ -116,8 +117,8 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
-    async fn test_deduplicating_transfer() -> Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn test_deduplicating_transfer() -> TestResult {
         let (root, ref client_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
         let total_bytes = total_dag_bytes(root, client_store).await?;
         let path = Rvg::new().sample(&vec(0usize..128, 0..64));
@@ -140,8 +141,8 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
-    async fn print_metrics() -> Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn print_metrics() -> TestResult {
         const TESTS: usize = 200;
         const DAG_SIZE: u16 = 256;
         const BLOCK_PADDING: usize = 10 * 1024;

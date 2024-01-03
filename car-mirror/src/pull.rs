@@ -54,6 +54,7 @@ mod tests {
     use futures::TryStreamExt;
     use libipld::Cid;
     use std::collections::HashSet;
+    use testresult::TestResult;
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
     pub(crate) async fn simulate_protocol(
@@ -85,8 +86,8 @@ mod tests {
         Ok(metrics)
     }
 
-    #[async_std::test]
-    async fn test_transfer() -> Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn test_transfer() -> TestResult {
         let client_store = &MemoryBlockStore::new();
         let (root, ref server_store) = setup_random_dag(256, 10 * 1024 /* 10 KiB */).await?;
 

@@ -130,13 +130,13 @@ impl DagWalk {
 mod tests {
     use super::*;
     use crate::traits::NoCache;
-    use anyhow::Result;
     use futures::TryStreamExt;
     use libipld::Ipld;
+    use testresult::TestResult;
     use wnfs_common::MemoryBlockStore;
 
-    #[async_std::test]
-    async fn test_walk_dag_breadth_first() -> Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn test_walk_dag_breadth_first() -> TestResult {
         let store = &MemoryBlockStore::new();
 
         // cid_root ---> cid_1_wrap ---> cid_1
