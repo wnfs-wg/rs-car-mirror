@@ -55,7 +55,7 @@ pub struct CarFile {
     pub bytes: Bytes,
 }
 
-/// TODO(matheus23): Docs
+/// A stream of blocks. This requires the underlying futures to be `Send`, except for the `wasm32` target.
 pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 
 //--------------------------------------------------------------------------------------------------
@@ -77,10 +77,15 @@ pub async fn block_send(
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<CarFile, Error> {
-    let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
-
-    let bytes =
-        write_blocks_into_car(Vec::new(), &mut block_stream, Some(config.receive_maximum)).await?;
+    let bytes = block_send_car_stream(
+        root,
+        last_state,
+        Vec::new(),
+        Some(config.receive_maximum),
+        store,
+        cache,
+    )
+    .await?;
 
     Ok(CarFile {
         bytes: bytes.into(),
@@ -93,11 +98,12 @@ pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
     stream: W,
+    send_limit: Option<usize>,
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<W, Error> {
     let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
-    write_blocks_into_car(stream, &mut block_stream, None).await
+    write_blocks_into_car(stream, &mut block_stream, send_limit).await
 }
 
 /// TODO(matheus23): Docs
@@ -142,22 +148,21 @@ pub async fn block_receive(
     store: &impl BlockStore,
     cache: &impl Cache,
 ) -> Result<ReceiverState, Error> {
-    let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
+    let mut receiver_state = match last_car {
+        Some(car) => {
+            if car.bytes.len() > config.receive_maximum {
+                return Err(Error::TooManyBytes {
+                    receive_maximum: config.receive_maximum,
+                    bytes_read: car.bytes.len(),
+                });
+            }
 
-    if let Some(car) = last_car {
-        let mut reader = CarReader::new(Cursor::new(car.bytes)).await?;
-
-        read_and_verify_blocks(
-            &mut dag_verification,
-            &mut reader,
-            config.receive_maximum,
-            store,
-            cache,
-        )
-        .await?;
-    }
-
-    let mut receiver_state = dag_verification.into_receiver_state(config.bloom_fpr);
+            block_receive_car_stream(root, Cursor::new(car.bytes), config, store, cache).await?
+        }
+        None => IncrementalDagVerification::new([root], store, cache)
+            .await?
+            .into_receiver_state(config.bloom_fpr),
+    };
 
     receiver_state
         .missing_subgraph_roots
@@ -318,7 +323,7 @@ fn stream_blocks_from_roots<'a>(
 async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     write: W,
     blocks: &mut BlockStream<'_>,
-    receive_limit: Option<usize>,
+    size_limit: Option<usize>,
 ) -> Result<W, Error> {
     let mut block_bytes = 0;
 
@@ -349,7 +354,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
         // and a 4-byte frame size varint (3 byte would be enough for an 8MiB frame).
         let added_bytes = 64 + 4 + block.len();
 
-        if let Some(receive_limit) = receive_limit {
+        if let Some(receive_limit) = size_limit {
             if block_bytes + added_bytes > receive_limit {
                 debug!(%cid, receive_limit, block_bytes, added_bytes, "Skipping block because it would go over the receive limit");
                 break;
@@ -366,46 +371,8 @@ fn should_block_be_skipped(cid: &Cid, bloom: &BloomFilter, subgraph_roots: &[Cid
     bloom.contains(&cid.to_bytes()) && !subgraph_roots.contains(cid)
 }
 
-async fn read_and_verify_blocks<R: tokio::io::AsyncRead + Unpin>(
-    dag_verification: &mut IncrementalDagVerification,
-    reader: &mut CarReader<R>,
-    receive_maximum: usize,
-    store: &impl BlockStore,
-    cache: &impl Cache,
-) -> Result<(), Error> {
-    let mut bytes_read = 0;
-    while let Some((cid, vec)) = reader.next_block().await? {
-        let block = Bytes::from(vec);
-
-        debug!(
-            cid = %cid,
-            num_bytes = block.len(),
-            "reading block from CAR",
-        );
-
-        bytes_read += block.len();
-        if bytes_read > receive_maximum {
-            return Err(Error::TooManyBytes {
-                bytes_read,
-                receive_maximum,
-            });
-        }
-
-        let block_state =
-            read_and_verify_block(dag_verification, (cid, block), store, cache).await?;
-
-        if matches!(block_state, BlockState::Unexpected) {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-/// Returns whether to continue receiving blocks.
-///
-/// Only returns false when a block was received out of order
-/// (or perhaps because a block was skipped due to a bloom filter false positive).
+/// Takes a block and stores it iff it's one of the blocks we're currently trying to retrieve.
+/// Returns the block state of the received block.
 async fn read_and_verify_block(
     dag_verification: &mut IncrementalDagVerification,
     (cid, block): (Cid, Bytes),
