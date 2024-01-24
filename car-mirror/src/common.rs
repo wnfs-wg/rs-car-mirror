@@ -92,7 +92,9 @@ pub async fn block_send(
     })
 }
 
-/// TODO(matheus23): Docs
+/// This is the streaming equivalent of `block_send`.
+///
+/// It uses the car file format for framing blocks & CIDs in the given `AsyncWrite`.
 #[instrument(skip_all, fields(root, last_state))]
 pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
@@ -106,7 +108,8 @@ pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
     write_blocks_into_car(stream, &mut block_stream, send_limit).await
 }
 
-/// TODO(matheus23): Docs
+/// This is the car mirror block sending function, but unlike `block_send_car_stream`
+/// it leaves framing blocks to the caller.
 pub async fn block_send_block_stream<'a>(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -171,7 +174,7 @@ pub async fn block_receive(
     Ok(receiver_state)
 }
 
-/// TODO(matheus23): Docs
+/// Like `block_receive`, but allows consuming the CAR file as a stream.
 #[instrument(skip_all, fields(root))]
 pub async fn block_receive_car_stream<R: tokio::io::AsyncRead + Unpin + CondSend>(
     root: Cid,
