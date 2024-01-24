@@ -191,7 +191,7 @@ mod quick_cache_tests {
     use testresult::TestResult;
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_has_block_cache() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = InMemoryCache::new(10_000, 150_000);
@@ -212,7 +212,7 @@ mod quick_cache_tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_references_cache() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = InMemoryCache::new(10_000, 150_000);
@@ -289,7 +289,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_has_block_cache() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = HashMapCache::default();
@@ -310,7 +310,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_references_cache() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = HashMapCache::default();
@@ -346,7 +346,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_no_cache_has_block() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = NoCache;
@@ -372,7 +372,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[test_log::test(async_std::test)]
     async fn test_no_cache_references() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = NoCache;

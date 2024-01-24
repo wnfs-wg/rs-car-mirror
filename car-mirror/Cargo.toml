@@ -24,7 +24,6 @@ doc = true
 
 [dependencies]
 anyhow = "1.0"
-async-stream = "0.3.5"
 async-trait = "0.1.73"
 bytes = "1.4"
 deterministic-bloom = "0.1"
@@ -40,7 +39,6 @@ serde_ipld_dagcbor = "0.4"
 thiserror = "1.0"
 tokio = { version = "^1", default-features = false }
 tracing = "0.1"
-tracing-subscriber = "0.3"
 wnfs-common = "0.1.26"
 
 [dev-dependencies]
@@ -48,8 +46,10 @@ async-std = { version = "1.11", features = ["attributes"] }
 car-mirror = { path = ".", features = ["test_utils"] }
 proptest = "1.1"
 roaring-graphs = "0.12"
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
 test-strategy = "0.3"
-testresult = "0.3.0"
+testresult = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
 
 [features]
 default = []
