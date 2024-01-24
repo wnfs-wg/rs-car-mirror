@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1704193385883,
+  "lastUpdate": 1706092841508,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -329,6 +329,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 2360672411,
             "range": "± 7458117",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "122f369e0853799b5478dcabf8c385b61be00492",
+          "message": "feat: Implement half-duplex streaming (#38)\n\nImplements streaming the CAR file that's generated in a response and consuming a response CAR stream.\r\n\r\nThis is not doing full-duplex streaming yet, but the difference shouldn't be too big.\r\n\r\nThis has helped cold sync in appa a lot, since it reduces the amount of round-trips to one and streams all bytes needed for sync in one go.\r\n\r\n---\r\n\r\n* feat: Implement streaming\r\n\r\n* fix: Good 'ol 1-character bug\r\n\r\n* chore: Switch tests to use `TestResult` and `test_log`\r\n\r\n* feat: Add useful trace msgs\r\n\r\n* refactor: Re-use streaming impl for non-streaming impl\r\n\r\n* chore: Write docs",
+          "timestamp": "2024-01-24T11:37:24+01:00",
+          "tree_id": "d6a94c1afece2b264b094219af0154252f7cca56",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/122f369e0853799b5478dcabf8c385b61be00492"
+        },
+        "date": 1706092841050,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 16374383,
+            "range": "± 210194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 16362489,
+            "range": "± 223723",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 6659108,
+            "range": "± 277642",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 6571856,
+            "range": "± 150890",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 444207640,
+            "range": "± 2073705",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 465828325,
+            "range": "± 2402642",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781619001,
+            "range": "± 5648135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 850282824,
+            "range": "± 4626115",
             "unit": "ns/iter"
           }
         ]
