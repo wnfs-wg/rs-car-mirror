@@ -5,13 +5,13 @@ description = "Rust implementation of the CAR Mirror protocol"
 keywords = []
 categories = []
 include = ["/src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
-license = "Apache-2.0 or MIT"
+license = "Apache-2.0"
 readme = "README.md"
 edition = "2021"
 rust-version = "1.66"
 documentation = "https://docs.rs/car-mirror-wasm"
 repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-wasm"
-authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
+authors = ["Philipp Krüger <pihlipp@fission.codes>"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
