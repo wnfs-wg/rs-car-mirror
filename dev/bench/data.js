@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1706092841508,
+  "lastUpdate": 1707758185157,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -401,6 +401,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 850282824,
             "range": "± 4626115",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "30670201913b7b978e3a7c157418ab8617e04746",
+          "message": "feat: Utilities for doing framed-streaming of car files (#39)\n\n* feat: Allow mode of streaming car file frames\r\n\r\nAlso:\r\n- remove `main.rs` from car-mirror crate\r\n- adjust authors\r\n\r\n* chore: Minor doc changes\r\n\r\n* chore: `cargo update`\r\n\r\n* chore: Update MSRV to 1.75",
+          "timestamp": "2024-02-12T18:13:03+01:00",
+          "tree_id": "36d250245507d395a2cdb7efa8e845a793445ce6",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/30670201913b7b978e3a7c157418ab8617e04746"
+        },
+        "date": 1707758184186,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 18890563,
+            "range": "± 496606",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 18323300,
+            "range": "± 1191510",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 6580239,
+            "range": "± 194787",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 6578345,
+            "range": "± 124553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 444178291,
+            "range": "± 2079503",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 465526475,
+            "range": "± 2581733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781612956,
+            "range": "± 5661403",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 850255550,
+            "range": "± 4605946",
             "unit": "ns/iter"
           }
         ]
