@@ -1,15 +1,13 @@
-#![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
-
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
-use futures::{future, TryStreamExt};
+use futures::{future, StreamExt, TryStreamExt};
 use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
 use std::io::Cursor;
 use tracing::{debug, instrument, trace, warn};
 use wnfs_common::{
-    utils::{BoxStream, CondSend},
+    utils::{boxed_stream, BoxStream, CondSend},
     BlockStore,
 };
 
@@ -51,11 +49,11 @@ pub struct ReceiverState {
 #[derive(Debug, Clone)]
 pub struct CarFile {
     /// The car file contents as bytes.
-    /// (`CarFile` is cheap to clone, since `Bytes` is an `Arc` wrapper around a byte buffer.)
+    /// (`CarFile` is cheap to clone, since `Bytes` is like an `Arc` wrapper around a byte buffer.)
     pub bytes: Bytes,
 }
 
-/// A stream of blocks. This requires the underlying futures to be `Send`, except for the `wasm32` target.
+/// A stream of blocks. This requires the underlying futures to be `Send`, except when the target is `wasm32`.
 pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 
 //--------------------------------------------------------------------------------------------------
@@ -233,6 +231,40 @@ pub async fn block_receive_block_stream(
     Ok(dag_verification.into_receiver_state(config.bloom_fpr))
 }
 
+/// Turns a stream of blocks (tuples of CIDs and Bytes) into a stream
+/// of frames for a CAR file.
+///
+/// Simply concatenated together, all these frames form a CARv1 file.
+///
+/// The frame boundaries are after the header section and between each block.
+///
+/// The first frame will always be a CAR file header frame.
+pub async fn stream_car_frames(
+    mut blocks: BlockStream<'_>,
+) -> Result<BoxStream<'_, Result<Bytes, Error>>, Error> {
+    // https://github.com/wnfs-wg/car-mirror-spec/issues/6
+    // CAR files *must* have at least one CID in them, and all of them
+    // need to appear as a block in the payload.
+    // It would probably make most sense to just write all subgraph roots into this,
+    // but we don't know how many of the subgraph roots fit into this round yet,
+    // so we're simply writing the first one in here, since we know
+    // at least one block will be written (and it'll be that one).
+    let Some((cid, block)) = blocks.try_next().await? else {
+        debug!("No blocks to write.");
+        return Ok(boxed_stream(futures::stream::empty()));
+    };
+
+    let mut writer = CarWriter::new(CarHeader::new_v1(vec![cid]), Vec::new());
+    writer.write_header().await?;
+    let first_frame = car_frame_from_block((cid, block)).await?;
+
+    let header = writer.finish().await?;
+    Ok(boxed_stream(
+        futures::stream::iter(vec![Ok(header.into()), Ok(first_frame)])
+            .chain(blocks.and_then(car_frame_from_block)),
+    ))
+}
+
 /// Find all CIDs that a block references.
 ///
 /// This will error out if
@@ -255,6 +287,26 @@ pub fn references<E: Extend<Cid>>(
 //--------------------------------------------------------------------------------------------------
 // Private
 //--------------------------------------------------------------------------------------------------
+
+async fn car_frame_from_block(block: (Cid, Bytes)) -> Result<Bytes, Error> {
+    // TODO(matheus23): I wish this were exposed in iroh-car somehow
+    // Instead of having to allocate so many things.
+
+    // The writer will always first emit a header.
+    // If we don't force it here, it'll do so in `writer.write()`.
+    // We do it here so we find out how many bytes we need to skip.
+    let bogus_header = CarHeader::new_v1(vec![Cid::default()]);
+    let mut writer = CarWriter::new(bogus_header, Vec::new());
+    let start = writer.write_header().await?;
+
+    writer.write(block.0, block.1).await?;
+    let mut bytes = writer.finish().await?;
+
+    // This removes the bogus header bytes
+    bytes.drain(0..start);
+
+    Ok(bytes.into())
+}
 
 async fn verify_missing_subgraph_roots(
     root: Cid,

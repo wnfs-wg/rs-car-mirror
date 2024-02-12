@@ -3,7 +3,7 @@ name = "car-mirror-benches"
 version = "0.1.0"
 publish = false
 edition = "2021"
-authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
+authors = ["Philipp Krüger <philipp@fission.codes>"]
 
 [dependencies]
 anyhow = "1.0"

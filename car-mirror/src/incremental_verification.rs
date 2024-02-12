@@ -1,5 +1,3 @@
-#![allow(unknown_lints)] // Because the `instrument` macro contains some `#[allow]`s that rust 1.66 doesn't know yet.
-
 use crate::{
     common::ReceiverState,
     dag_walk::DagWalk,
