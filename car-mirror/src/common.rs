@@ -51,11 +51,11 @@ pub struct ReceiverState {
 #[derive(Debug, Clone)]
 pub struct CarFile {
     /// The car file contents as bytes.
-    /// (`CarFile` is cheap to clone, since `Bytes` is an `Arc` wrapper around a byte buffer.)
+    /// (`CarFile` is cheap to clone, since `Bytes` is like an `Arc` wrapper around a byte buffer.)
     pub bytes: Bytes,
 }
 
-/// A stream of blocks. This requires the underlying futures to be `Send`, except for the `wasm32` target.
+/// A stream of blocks. This requires the underlying futures to be `Send`, except when the target is `wasm32`.
 pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 
 //--------------------------------------------------------------------------------------------------
