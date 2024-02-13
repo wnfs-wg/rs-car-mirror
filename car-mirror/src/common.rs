@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
@@ -72,8 +72,8 @@ pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let bytes = block_send_car_stream(
         root,
@@ -94,13 +94,13 @@ pub async fn block_send(
 ///
 /// It uses the car file format for framing blocks & CIDs in the given `AsyncWrite`.
 #[instrument(skip_all, fields(root, last_state))]
-pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
+pub async fn block_send_car_stream<W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
     stream: W,
     send_limit: Option<usize>,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<W, Error> {
     let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
     write_blocks_into_car(stream, &mut block_stream, send_limit).await
@@ -111,8 +111,8 @@ pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
 pub async fn block_send_block_stream<'a>(
     root: Cid,
     last_state: Option<ReceiverState>,
-    store: &'a impl BlockStore,
-    cache: &'a impl Cache,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
 ) -> Result<BlockStream<'a>, Error> {
     let ReceiverState {
         missing_subgraph_roots,
@@ -124,7 +124,7 @@ pub async fn block_send_block_stream<'a>(
 
     // Verify that all missing subgraph roots are in the relevant DAG:
     let subgraph_roots =
-        verify_missing_subgraph_roots(root, &missing_subgraph_roots, store, cache).await?;
+        verify_missing_subgraph_roots(root, &missing_subgraph_roots, &store, &cache).await?;
 
     let bloom = handle_missing_bloom(have_cids_bloom);
 
@@ -356,23 +356,22 @@ fn handle_missing_bloom(have_cids_bloom: Option<BloomFilter>) -> BloomFilter {
 fn stream_blocks_from_roots<'a>(
     subgraph_roots: Vec<Cid>,
     bloom: BloomFilter,
-    store: &'a impl BlockStore,
-    cache: &'a impl Cache,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
 ) -> BlockStream<'a> {
-    Box::pin(
-        DagWalk::breadth_first(subgraph_roots.clone())
-            .stream(store, cache)
-            .try_filter(move |cid| {
-                future::ready(!should_block_be_skipped(cid, &bloom, &subgraph_roots))
-            })
-            .and_then(move |cid| async move {
-                let bytes = store
-                    .get_block(&cid)
-                    .await
-                    .map_err(Error::BlockStoreError)?;
-                Ok((cid, bytes))
-            }),
-    )
+    Box::pin(async_stream::try_stream! {
+        let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
+
+        while let Some(cid) = dag_walk.next(&store, &cache).await? {
+            if should_block_be_skipped(&cid, &bloom, &subgraph_roots) {
+                continue;
+            }
+
+            let bytes = store.get_block(&cid).await.map_err(Error::BlockStoreError)?;
+
+            yield (cid, bytes);
+        }
+    })
 }
 
 async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
@@ -585,8 +584,8 @@ mod tests {
                 unimplemented!(),
                 unimplemented!(),
                 unimplemented!(),
-                unimplemented!() as &MemoryBlockStore,
-                &NoCache,
+                unimplemented!() as MemoryBlockStore,
+                NoCache,
             )
         });
         assert_cond_send_sync(|| {

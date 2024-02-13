@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use bytes::Bytes;
 use car_mirror::{
     common::Config,
@@ -35,9 +34,17 @@ pub fn push_throttled(c: &mut Criterion) {
 
                 // Simulate a multi-round protocol run in-memory
                 async_std::task::block_on(async move {
-                    let mut request =
-                        push::request(root, None, config, client_store, client_cache).await?;
+                    let mut last_response = None;
                     loop {
+                        let request = push::request(
+                            root,
+                            last_response,
+                            config,
+                            client_store.clone(),
+                            client_cache.clone(),
+                        )
+                        .await?;
+
                         let response =
                             push::response(root, request, config, server_store, server_cache)
                                 .await?;
@@ -45,9 +52,8 @@ pub fn push_throttled(c: &mut Criterion) {
                         if response.indicates_finished() {
                             break;
                         }
-                        request =
-                            push::request(root, Some(response), config, client_store, client_cache)
-                                .await?;
+
+                        last_response = Some(response);
                     }
 
                     Ok::<(), anyhow::Error>(())
@@ -109,8 +115,6 @@ pub fn pull_throttled(c: &mut Criterion) {
 #[derive(Debug, Clone)]
 struct ThrottledBlockStore(MemoryBlockStore);
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl BlockStore for ThrottledBlockStore {
     async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
         let bytes = self.0.get_block(cid).await?;

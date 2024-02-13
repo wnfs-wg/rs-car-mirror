@@ -35,8 +35,8 @@ pub async fn response(
     root: Cid,
     request: PullRequest,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let receiver_state = Some(ReceiverState::from(request));
     block_send(root, receiver_state, config, store, cache).await
@@ -68,7 +68,7 @@ mod tests {
         loop {
             let request_bytes = serde_ipld_dagcbor::to_vec(&request)?.len();
             let response =
-                crate::pull::response(root, request, config, server_store, &NoCache).await?;
+                crate::pull::response(root, request, config, server_store, NoCache).await?;
             let response_bytes = response.bytes.len();
 
             metrics.push(Metrics {
