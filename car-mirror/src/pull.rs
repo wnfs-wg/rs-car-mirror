@@ -17,13 +17,14 @@ use wnfs_common::BlockStore;
 ///
 /// Before actually sending the request over the network,
 /// make sure to check the `request.indicates_finished()`.
-/// If true, the client already has all data.
+/// If true, the client already has all data and the request
+/// doesn't need to be sent.
 pub async fn request(
     root: Cid,
     last_response: Option<CarFile>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<PullRequest, Error> {
     Ok(block_receive(root, last_response, config, store, cache)
         .await?

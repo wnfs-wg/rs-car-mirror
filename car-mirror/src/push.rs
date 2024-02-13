@@ -40,8 +40,8 @@ pub async fn response(
     root: Cid,
     request: CarFile,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<PushResponse, Error> {
     Ok(block_receive(root, Some(request), config, store, cache)
         .await?

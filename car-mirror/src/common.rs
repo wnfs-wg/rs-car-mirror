@@ -146,8 +146,8 @@ pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
     let mut receiver_state = match last_car {
         Some(car) => {
@@ -160,7 +160,7 @@ pub async fn block_receive(
 
             block_receive_car_stream(root, Cursor::new(car.bytes), config, store, cache).await?
         }
-        None => IncrementalDagVerification::new([root], store, cache)
+        None => IncrementalDagVerification::new([root], &store, &cache)
             .await?
             .into_receiver_state(config.bloom_fpr),
     };
@@ -178,8 +178,8 @@ pub async fn block_receive_car_stream<R: tokio::io::AsyncRead + Unpin + CondSend
     root: Cid,
     reader: R,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
     let reader = CarReader::new(reader).await?;
 
@@ -199,13 +199,13 @@ pub async fn block_receive_block_stream(
     root: Cid,
     stream: &mut BlockStream<'_>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
-    let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
+    let mut dag_verification = IncrementalDagVerification::new([root], &store, &cache).await?;
 
     while let Some((cid, block)) = stream.try_next().await? {
-        match read_and_verify_block(&mut dag_verification, (cid, block), store, cache).await? {
+        match read_and_verify_block(&mut dag_verification, (cid, block), &store, &cache).await? {
             BlockState::Have => {
                 // This can happen because we've just discovered a subgraph we already have.
                 // Let's update the endpoint with our new receiver state.
