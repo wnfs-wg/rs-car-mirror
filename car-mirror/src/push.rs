@@ -21,8 +21,8 @@ pub async fn request(
     root: Cid,
     last_response: Option<PushResponse>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let receiver_state = last_response.map(ReceiverState::from);
     block_send(root, receiver_state, config, store, cache).await

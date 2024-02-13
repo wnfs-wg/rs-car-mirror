@@ -101,6 +101,27 @@ impl DagWalk {
         }))
     }
 
+    /// Turn this traversal into a stream that takes ownership of the store & cache.
+    ///
+    /// In most cases `store` and `cache` should be cheaply-clonable types, so giving
+    /// the traversal ownership of them shouldn't be a big deal.
+    ///
+    /// This helps with creating streams that are `: 'static`, which is useful for
+    /// anything that ends up being put into e.g. a tokio task.
+    pub fn stream_owned(
+        self,
+        store: impl BlockStore,
+        cache: impl Cache,
+    ) -> impl Stream<Item = Result<Cid, Error>> + Unpin {
+        Box::pin(try_unfold(
+            (self, store, cache),
+            move |(mut this, store, cache)| async move {
+                let maybe_block = this.next(&store, &cache).await?;
+                Ok(maybe_block.map(|b| (b, (this, store, cache))))
+            },
+        ))
+    }
+
     /// Find out whether the traversal is finished.
     ///
     /// The next call to `next` would result in `None` if this returns true.

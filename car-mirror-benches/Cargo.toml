@@ -6,14 +6,13 @@ edition = "2021"
 authors = ["Philipp Krüger <philipp@fission.codes>"]
 
 [dependencies]
-anyhow = "1.0"
+anyhow = { workspace = true }
 async-std = { version = "1.11", features = ["attributes"] }
-async-trait = "0.1"
-bytes = "1.4.0"
+bytes = { workspace = true }
 car-mirror = { path = "../car-mirror", version = "0.1", features = ["test_utils", "quick_cache"] }
-libipld = "0.16.0"
-serde_ipld_dagcbor = "0.4.0"
-wnfs-common = "0.1.23"
+libipld = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+wnfs-common = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false }
