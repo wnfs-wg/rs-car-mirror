@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::common::references;
 use anyhow::Result;
 use futures::Future;
@@ -114,21 +112,39 @@ pub trait Cache: CondSync {
     }
 }
 
-impl<C: Cache, T: Deref<Target = C> + CondSync> Cache for T {
+impl<C: Cache> Cache for &C {
     async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
-        self.deref().get_references_cache(cid).await
+        (**self).get_references_cache(cid).await
     }
 
     async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
-        self.deref().put_references_cache(cid, references).await
+        (**self).put_references_cache(cid, references).await
     }
 
     async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
-        self.deref().get_has_block_cache(cid).await
+        (**self).get_has_block_cache(cid).await
     }
 
     async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
-        self.deref().put_has_block_cache(cid).await
+        (**self).put_has_block_cache(cid).await
+    }
+}
+
+impl<C: Cache> Cache for Box<C> {
+    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+        (**self).get_references_cache(cid).await
+    }
+
+    async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+        (**self).put_references_cache(cid, references).await
+    }
+
+    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
+        (**self).get_has_block_cache(cid).await
+    }
+
+    async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
+        (**self).put_has_block_cache(cid).await
     }
 }
 
