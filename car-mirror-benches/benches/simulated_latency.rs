@@ -68,12 +68,12 @@ pub fn pull_with_simulated_latency(
                     links_to_padded_ipld(block_padding),
                 ));
                 let store = async_std::task::block_on(setup_blockstore(blocks)).unwrap();
-                let cache = InMemoryCache::new(10_000, 150_000);
+                let cache = InMemoryCache::new(10_000);
                 (store, cache, root)
             },
             |(ref server_store, ref server_cache, root)| {
                 let client_store = &MemoryBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000, 150_000);
+                let client_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -145,12 +145,12 @@ pub fn push_with_simulated_latency(
                     links_to_padded_ipld(block_padding),
                 ));
                 let store = async_std::task::block_on(setup_blockstore(blocks)).unwrap();
-                let cache = InMemoryCache::new(10_000, 150_000);
+                let cache = InMemoryCache::new(10_000);
                 (store, cache, root)
             },
             |(ref client_store, ref client_cache, root)| {
                 let server_store = &MemoryBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000, 150_000);
+                let server_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory

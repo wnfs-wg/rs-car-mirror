@@ -308,6 +308,8 @@ async fn car_frame_from_block(block: (Cid, Bytes)) -> Result<Bytes, Error> {
     Ok(bytes.into())
 }
 
+/// Ensure that any requested subgraph roots are actually part
+/// of the DAG from the root.
 async fn verify_missing_subgraph_roots(
     root: Cid,
     missing_subgraph_roots: &[Cid],
@@ -316,9 +318,10 @@ async fn verify_missing_subgraph_roots(
 ) -> Result<Vec<Cid>, Error> {
     let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
         .stream(store, cache)
-        .try_filter_map(
-            |cid| async move { Ok(missing_subgraph_roots.contains(&cid).then_some(cid)) },
-        )
+        .try_filter_map(|item| async move {
+            let cid = item.to_cid()?;
+            Ok(missing_subgraph_roots.contains(&cid).then_some(cid))
+        })
         .try_collect()
         .await?;
 
@@ -362,7 +365,9 @@ fn stream_blocks_from_roots<'a>(
     Box::pin(async_stream::try_stream! {
         let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
 
-        while let Some(cid) = dag_walk.next(&store, &cache).await? {
+        while let Some(item) = dag_walk.next(&store, &cache).await? {
+            let cid = item.to_cid()?;
+
             if should_block_be_skipped(&cid, &bloom, &subgraph_roots) {
                 continue;
             }

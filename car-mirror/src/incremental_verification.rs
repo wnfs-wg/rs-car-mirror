@@ -1,6 +1,6 @@
 use crate::{
     common::ReceiverState,
-    dag_walk::DagWalk,
+    dag_walk::{DagWalk, TraversedItem},
     error::{Error, IncrementalVerificationError},
     traits::Cache,
 };
@@ -12,7 +12,7 @@ use libipld_core::{
 };
 use std::{collections::HashSet, matches};
 use tracing::instrument;
-use wnfs_common::{BlockStore, BlockStoreError};
+use wnfs_common::BlockStore;
 
 /// A data structure that keeps state about incremental DAG verification.
 #[derive(Clone, Debug)]
@@ -65,34 +65,14 @@ impl IncrementalDagVerification {
     ) -> Result<(), Error> {
         let mut dag_walk = DagWalk::breadth_first(self.want_cids.iter().cloned());
 
-        loop {
-            match dag_walk.next(store, cache).await {
-                Err(Error::BlockStoreError(e)) => {
-                    if let Some(BlockStoreError::CIDNotFound(not_found)) =
-                        e.downcast_ref::<BlockStoreError>()
-                    {
-                        tracing::trace!(%not_found, "Missing block, adding to want list");
-                        self.mark_as_want(*not_found);
-                    } else {
-                        return Err(Error::BlockStoreError(e));
-                    }
+        while let Some(item) = dag_walk.next(store, cache).await? {
+            match item {
+                TraversedItem::Have(cid) => {
+                    self.mark_as_have(cid);
                 }
-                Err(e) => return Err(e),
-                Ok(Some(cid)) => {
-                    let not_found = matches!(
-                        store.get_block(&cid).await,
-                        Err(e) if matches!(e.downcast_ref(), Some(BlockStoreError::CIDNotFound(_)))
-                    );
-
-                    if not_found {
-                        tracing::trace!(%cid, "Missing block, adding to want list");
-                        self.mark_as_want(cid);
-                    } else {
-                        self.mark_as_have(cid);
-                    }
-                }
-                Ok(None) => {
-                    break;
+                TraversedItem::Missing(cid) => {
+                    tracing::trace!(%cid, "Missing block, adding to want list");
+                    self.mark_as_want(cid);
                 }
             }
         }
@@ -179,19 +159,10 @@ impl IncrementalDagVerification {
             .into());
         }
 
-        let actual_cid = store
-            .put_block(bytes, cid.codec())
+        store
+            .put_block_keyed(cid, bytes)
             .await
             .map_err(Error::BlockStoreError)?;
-
-        // TODO(matheus23): The BlockStore chooses the hashing function,
-        // so it may choose a different hashing function, causing a mismatch
-        if actual_cid != cid {
-            return Err(Error::BlockStoreIncompatible {
-                cid: Box::new(cid),
-                actual_cid: Box::new(actual_cid),
-            });
-        }
 
         self.update_have_cids(store, cache).await?;
 

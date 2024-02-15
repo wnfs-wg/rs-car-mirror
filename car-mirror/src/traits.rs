@@ -6,7 +6,7 @@ use libipld::{Cid, IpldCodec};
 use wnfs_common::utils::Arc;
 use wnfs_common::{
     utils::{CondSend, CondSync},
-    BlockStore, BlockStoreError,
+    BlockStore,
 };
 
 /// This trait abstracts caches used by the car mirror implementation.
@@ -36,19 +36,6 @@ pub trait Cache: CondSync {
         references: Vec<Cid>,
     ) -> impl Future<Output = Result<()>> + CondSend;
 
-    /// This returns whether the cache has the fact stored that a block with given
-    /// CID is stored.
-    ///
-    /// This only returns `true` in case the block has been stored.
-    /// `false` simply indicates that the cache doesn't know whether the block is
-    /// stored or not (it's always a cache miss).
-    ///
-    /// Don't call this directly, instead, use `Cache::has_block`.
-    fn get_has_block_cache(&self, cid: &Cid) -> impl Future<Output = Result<bool>> + CondSend;
-
-    /// This populates the cache with the fact that a block with given CID is stored.
-    fn put_has_block_cache(&self, cid: Cid) -> impl Future<Output = Result<()>> + CondSend;
-
     /// Find out any CIDs that are linked to from the block with given CID.
     ///
     /// This makes use of the cache via `get_references_cached`, if possible.
@@ -76,40 +63,6 @@ pub trait Cache: CondSync {
             Ok(refs)
         }
     }
-
-    /// Find out whether a given block is stored in given blockstore or not.
-    ///
-    /// This cache is *only* effective on `true` values for `has_block`.
-    /// Repeatedly calling `has_block` with `Cid`s of blocks that are *not*
-    /// stored will cause repeated calls to given blockstore.
-    ///
-    /// **Make sure to always use the same `BlockStore` when calling this function.**
-    ///
-    /// This makes use of the caches `get_has_block_cached`, if possible.
-    /// On cache misses, this will actually fetch the block from the store
-    /// and if successful, populate the cache using `put_has_block_cached`.
-    fn has_block(
-        &self,
-        cid: Cid,
-        store: &impl BlockStore,
-    ) -> impl Future<Output = Result<bool>> + CondSend {
-        async move {
-            if self.get_has_block_cache(&cid).await? {
-                return Ok(true);
-            }
-
-            match store.get_block(&cid).await {
-                Ok(_) => {
-                    self.put_has_block_cache(cid).await?;
-                    Ok(true)
-                }
-                Err(e) if matches!(e.downcast_ref(), Some(BlockStoreError::CIDNotFound(_))) => {
-                    Ok(false)
-                }
-                Err(e) => Err(e),
-            }
-        }
-    }
 }
 
 impl<C: Cache> Cache for &C {
@@ -119,14 +72,6 @@ impl<C: Cache> Cache for &C {
 
     async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
         (**self).put_references_cache(cid, references).await
-    }
-
-    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
-        (**self).get_has_block_cache(cid).await
-    }
-
-    async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
-        (**self).put_has_block_cache(cid).await
     }
 }
 
@@ -138,14 +83,6 @@ impl<C: Cache> Cache for Box<C> {
     async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
         (**self).put_references_cache(cid, references).await
     }
-
-    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
-        (**self).get_has_block_cache(cid).await
-    }
-
-    async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
-        (**self).put_has_block_cache(cid).await
-    }
 }
 
 /// A [quick-cache]-based implementation of a car mirror cache.
@@ -155,14 +92,12 @@ impl<C: Cache> Cache for Box<C> {
 #[derive(Debug, Clone)]
 pub struct InMemoryCache {
     references: Arc<quick_cache::sync::Cache<Cid, Vec<Cid>>>,
-    has_blocks: Arc<quick_cache::sync::Cache<Cid, ()>>,
 }
 
 #[cfg(feature = "quick_cache")]
 impl InMemoryCache {
     /// Create a new in-memory cache that approximately holds
-    /// cached references for `approx_references_capacity` CIDs
-    /// and `approx_has_blocks_capacity` CIDs known to be stored locally.
+    /// cached references for `approx_references_capacity` CIDs.
     ///
     /// Computing the expected memory requirements for the reference
     /// cache isn't easy.
@@ -179,15 +114,10 @@ impl InMemoryCache {
     ///
     /// In practice, the fanout average will be much lower than 174.
     ///
-    /// On the other hand, each cache entry for the `has_blocks` cache
-    /// will take a little more than 64 bytes, so for a 10MB
-    /// `has_blocks` cache, you would use `10MB / 64bytes = 156_250`.
-    ///
     /// [UnixFS]: https://github.com/ipfs/specs/blob/main/UNIXFS.md#layout
-    pub fn new(approx_references_capacity: usize, approx_has_blocks_capacity: usize) -> Self {
+    pub fn new(approx_references_capacity: usize) -> Self {
         Self {
             references: Arc::new(quick_cache::sync::Cache::new(approx_references_capacity)),
-            has_blocks: Arc::new(quick_cache::sync::Cache::new(approx_has_blocks_capacity)),
         }
     }
 }
@@ -200,15 +130,6 @@ impl Cache for InMemoryCache {
 
     async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
         self.references.insert(cid, references);
-        Ok(())
-    }
-
-    async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
-        Ok(self.has_blocks.get(cid).is_some())
-    }
-
-    async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
-        self.has_blocks.insert(cid, ());
         Ok(())
     }
 }
@@ -225,49 +146,20 @@ impl Cache for NoCache {
     async fn put_references_cache(&self, _: Cid, _: Vec<Cid>) -> Result<()> {
         Ok(())
     }
-
-    async fn get_has_block_cache(&self, _: &Cid) -> Result<bool> {
-        Ok(false)
-    }
-
-    async fn put_has_block_cache(&self, _: Cid) -> Result<()> {
-        Ok(())
-    }
 }
 
 #[cfg(feature = "quick_cache")]
 #[cfg(test)]
 mod quick_cache_tests {
     use super::{Cache, InMemoryCache};
-    use libipld::{Ipld, IpldCodec};
+    use libipld::{cbor::DagCborCodec, Ipld, IpldCodec};
     use testresult::TestResult;
-    use wnfs_common::{BlockStore, MemoryBlockStore};
-
-    #[test_log::test(async_std::test)]
-    async fn test_has_block_cache() -> TestResult {
-        let store = &MemoryBlockStore::new();
-        let cache = InMemoryCache::new(10_000, 150_000);
-
-        let cid = store
-            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
-            .await?;
-
-        // Initially, the cache is unpopulated
-        assert!(!cache.get_has_block_cache(&cid).await?);
-
-        // Then, we populate that cache
-        assert!(cache.has_block(cid, store).await?);
-
-        // Now, the cache should be populated
-        assert!(cache.get_has_block_cache(&cid).await?);
-
-        Ok(())
-    }
+    use wnfs_common::{encode, BlockStore, MemoryBlockStore};
 
     #[test_log::test(async_std::test)]
     async fn test_references_cache() -> TestResult {
         let store = &MemoryBlockStore::new();
-        let cache = InMemoryCache::new(10_000, 150_000);
+        let cache = InMemoryCache::new(10_000);
 
         let hello_one_cid = store
             .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
@@ -276,10 +168,13 @@ mod quick_cache_tests {
             .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
             .await?;
         let cid = store
-            .put_serializable(&Ipld::List(vec![
-                Ipld::Link(hello_one_cid),
-                Ipld::Link(hello_two_cid),
-            ]))
+            .put_block(
+                encode(
+                    &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
+                    DagCborCodec,
+                )?,
+                DagCborCodec.into(),
+            )
             .await?;
 
         // Cache unpopulated initially
@@ -305,18 +200,14 @@ mod quick_cache_tests {
 mod tests {
     use super::{Cache, NoCache};
     use anyhow::Result;
-    use libipld::{Cid, Ipld, IpldCodec};
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::RwLock,
-    };
+    use libipld::{cbor::DagCborCodec, Cid, Ipld, IpldCodec};
+    use std::{collections::HashMap, sync::RwLock};
     use testresult::TestResult;
-    use wnfs_common::{BlockStore, MemoryBlockStore};
+    use wnfs_common::{encode, BlockStore, MemoryBlockStore};
 
     #[derive(Debug, Default)]
     struct HashMapCache {
         references: RwLock<HashMap<Cid, Vec<Cid>>>,
-        has_blocks: RwLock<HashSet<Cid>>,
     }
 
     impl Cache for HashMapCache {
@@ -328,36 +219,6 @@ mod tests {
             self.references.write().unwrap().insert(cid, references);
             Ok(())
         }
-
-        async fn get_has_block_cache(&self, cid: &Cid) -> Result<bool> {
-            Ok(self.has_blocks.read().unwrap().contains(cid))
-        }
-
-        async fn put_has_block_cache(&self, cid: Cid) -> Result<()> {
-            self.has_blocks.write().unwrap().insert(cid);
-            Ok(())
-        }
-    }
-
-    #[test_log::test(async_std::test)]
-    async fn test_has_block_cache() -> TestResult {
-        let store = &MemoryBlockStore::new();
-        let cache = HashMapCache::default();
-
-        let cid = store
-            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
-            .await?;
-
-        // Initially, the cache is unpopulated
-        assert!(!cache.get_has_block_cache(&cid).await?);
-
-        // Then, we populate that cache
-        assert!(cache.has_block(cid, store).await?);
-
-        // Now, the cache should be populated
-        assert!(cache.get_has_block_cache(&cid).await?);
-
-        Ok(())
     }
 
     #[test_log::test(async_std::test)]
@@ -372,10 +233,13 @@ mod tests {
             .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
             .await?;
         let cid = store
-            .put_serializable(&Ipld::List(vec![
-                Ipld::Link(hello_one_cid),
-                Ipld::Link(hello_two_cid),
-            ]))
+            .put_block(
+                encode(
+                    &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
+                    DagCborCodec,
+                )?,
+                DagCborCodec.into(),
+            )
             .await?;
 
         // Cache unpopulated initially
@@ -397,32 +261,6 @@ mod tests {
     }
 
     #[test_log::test(async_std::test)]
-    async fn test_no_cache_has_block() -> TestResult {
-        let store = &MemoryBlockStore::new();
-        let cache = NoCache;
-
-        let cid = store
-            .put_block(b"Hello, World!".to_vec(), IpldCodec::Raw.into())
-            .await?;
-
-        let not_stored_cid = store.create_cid(b"Hi!", IpldCodec::Raw.into())?;
-
-        // Cache should start out unpopulated
-        assert!(!cache.get_has_block_cache(&cid).await?);
-
-        // Then we "try to populate it".
-        assert!(cache.has_block(cid, store).await?);
-
-        // It should still give correct answers
-        assert!(!cache.has_block(not_stored_cid, store).await?);
-
-        // Still, it should stay unpopulated
-        assert!(!cache.get_has_block_cache(&cid).await?);
-
-        Ok(())
-    }
-
-    #[test_log::test(async_std::test)]
     async fn test_no_cache_references() -> TestResult {
         let store = &MemoryBlockStore::new();
         let cache = NoCache;
@@ -434,10 +272,13 @@ mod tests {
             .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
             .await?;
         let cid = store
-            .put_serializable(&Ipld::List(vec![
-                Ipld::Link(hello_one_cid),
-                Ipld::Link(hello_two_cid),
-            ]))
+            .put_block(
+                encode(
+                    &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
+                    DagCborCodec,
+                )?,
+                DagCborCodec.into(),
+            )
             .await?;
 
         // Cache should start out unpopulated

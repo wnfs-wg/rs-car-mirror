@@ -27,9 +27,9 @@ pub fn push_throttled(c: &mut Criterion) {
             },
             |(client_store, root)| {
                 let client_store = &ThrottledBlockStore(client_store);
-                let client_cache = &InMemoryCache::new(10_000, 150_000);
+                let client_cache = &InMemoryCache::new(10_000);
                 let server_store = &ThrottledBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000, 150_000);
+                let server_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -81,9 +81,9 @@ pub fn pull_throttled(c: &mut Criterion) {
             },
             |(server_store, root)| {
                 let server_store = &ThrottledBlockStore(server_store);
-                let server_cache = &InMemoryCache::new(10_000, 150_000);
+                let server_cache = &InMemoryCache::new(10_000);
                 let client_store = &ThrottledBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000, 150_000);
+                let client_cache = &InMemoryCache::new(10_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -117,13 +117,21 @@ struct ThrottledBlockStore(MemoryBlockStore);
 
 impl BlockStore for ThrottledBlockStore {
     async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
-        let bytes = self.0.get_block(cid).await?;
         async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
-        Ok(bytes)
+        self.0.get_block(cid).await
     }
 
     async fn put_block(&self, bytes: impl Into<Bytes> + CondSend, codec: u64) -> Result<Cid> {
         self.0.put_block(bytes, codec).await
+    }
+
+    async fn put_block_keyed(&self, cid: Cid, bytes: impl Into<Bytes> + CondSend) -> Result<()> {
+        self.0.put_block_keyed(cid, bytes).await
+    }
+
+    async fn has_block(&self, cid: &Cid) -> Result<bool> {
+        // The idea is that has_block would be faster than `get_block`, as it should be managed closer to CPU memory
+        self.0.has_block(cid).await
     }
 }
 
