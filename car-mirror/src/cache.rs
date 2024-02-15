@@ -131,7 +131,8 @@ mod quick_cache {
     /// consecutive `has_block` and `get_block` calls.
     #[derive(Debug, Clone)]
     pub struct CacheMissing<B: BlockStore> {
-        inner: B,
+        /// Access to the inner blockstore
+        pub inner: B,
         has_blocks: Arc<sync::Cache<Cid, bool>>,
     }
 
