@@ -1,10 +1,9 @@
 use crate::common::references;
-use anyhow::Result;
 use futures::Future;
 use libipld::{Cid, IpldCodec};
 use wnfs_common::{
     utils::{CondSend, CondSync},
-    BlockStore,
+    BlockStore, BlockStoreError,
 };
 
 /// This trait abstracts caches used by the car mirror implementation.
@@ -25,14 +24,14 @@ pub trait Cache: CondSync {
     fn get_references_cache(
         &self,
         cid: Cid,
-    ) -> impl Future<Output = Result<Option<Vec<Cid>>>> + CondSend;
+    ) -> impl Future<Output = Result<Option<Vec<Cid>>, BlockStoreError>> + CondSend;
 
     /// Populates the references cache for given CID with given references.
     fn put_references_cache(
         &self,
         cid: Cid,
         references: Vec<Cid>,
-    ) -> impl Future<Output = Result<()>> + CondSend;
+    ) -> impl Future<Output = Result<(), BlockStoreError>> + CondSend;
 
     /// Find out any CIDs that are linked to from the block with given CID.
     ///
@@ -43,7 +42,7 @@ pub trait Cache: CondSync {
         &self,
         cid: Cid,
         store: &impl BlockStore,
-    ) -> impl Future<Output = Result<Vec<Cid>>> + CondSend {
+    ) -> impl Future<Output = Result<Vec<Cid>, BlockStoreError>> + CondSend {
         async move {
             // raw blocks don't have further links
             let raw_codec: u64 = IpldCodec::Raw.into();
@@ -64,21 +63,29 @@ pub trait Cache: CondSync {
 }
 
 impl<C: Cache> Cache for &C {
-    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>, BlockStoreError> {
         (**self).get_references_cache(cid).await
     }
 
-    async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+    async fn put_references_cache(
+        &self,
+        cid: Cid,
+        references: Vec<Cid>,
+    ) -> Result<(), BlockStoreError> {
         (**self).put_references_cache(cid, references).await
     }
 }
 
 impl<C: Cache> Cache for Box<C> {
-    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+    async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>, BlockStoreError> {
         (**self).get_references_cache(cid).await
     }
 
-    async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+    async fn put_references_cache(
+        &self,
+        cid: Cid,
+        references: Vec<Cid>,
+    ) -> Result<(), BlockStoreError> {
         (**self).put_references_cache(cid, references).await
     }
 }
@@ -88,11 +95,11 @@ impl<C: Cache> Cache for Box<C> {
 pub struct NoCache;
 
 impl Cache for NoCache {
-    async fn get_references_cache(&self, _: Cid) -> Result<Option<Vec<Cid>>> {
+    async fn get_references_cache(&self, _: Cid) -> Result<Option<Vec<Cid>>, BlockStoreError> {
         Ok(None)
     }
 
-    async fn put_references_cache(&self, _: Cid, _: Vec<Cid>) -> Result<()> {
+    async fn put_references_cache(&self, _: Cid, _: Vec<Cid>) -> Result<(), BlockStoreError> {
         Ok(())
     }
 }
@@ -103,7 +110,6 @@ pub use quick_cache::*;
 #[cfg(feature = "quick_cache")]
 mod quick_cache {
     use super::Cache;
-    use anyhow::{anyhow, Result};
     use bytes::Bytes;
     use libipld::Cid;
     use quick_cache::{sync, OptionsBuilder, Weighter};
@@ -157,11 +163,18 @@ mod quick_cache {
     }
 
     impl Cache for InMemoryCache {
-        async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+        async fn get_references_cache(
+            &self,
+            cid: Cid,
+        ) -> Result<Option<Vec<Cid>>, BlockStoreError> {
             Ok(self.references.get(&cid))
         }
 
-        async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+        async fn put_references_cache(
+            &self,
+            cid: Cid,
+            references: Vec<Cid>,
+        ) -> Result<(), BlockStoreError> {
             self.references.insert(cid, references);
             Ok(())
         }
@@ -191,23 +204,20 @@ mod quick_cache {
     }
 
     impl<B: BlockStore> BlockStore for CacheMissing<B> {
-        async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
+        async fn get_block(&self, cid: &Cid) -> Result<Bytes, BlockStoreError> {
             match self.has_blocks.get_value_or_guard_async(cid).await {
-                Ok(false) => Err(anyhow!(BlockStoreError::CIDNotFound(*cid))),
+                Ok(false) => Err(BlockStoreError::CIDNotFound(*cid)),
                 Ok(true) => self.inner.get_block(cid).await,
                 Err(guard) => match self.inner.get_block(cid).await {
                     Ok(block) => {
                         let _ignore_meantime_eviction = guard.insert(true);
                         Ok(block)
                     }
-                    Err(e) => {
-                        if let Some(BlockStoreError::CIDNotFound(_)) = e.downcast_ref() {
-                            let _ignore_meantime_eviction = guard.insert(false);
-                            Err(e)
-                        } else {
-                            Err(e)
-                        }
+                    e @ Err(BlockStoreError::CIDNotFound(_)) => {
+                        let _ignore_meantime_eviction = guard.insert(false);
+                        e
                     }
+                    Err(e) => Err(e),
                 },
             }
         }
@@ -216,16 +226,30 @@ mod quick_cache {
             &self,
             cid: Cid,
             bytes: impl Into<Bytes> + CondSend,
-        ) -> Result<()> {
+        ) -> Result<(), BlockStoreError> {
             self.inner.put_block_keyed(cid, bytes).await?;
             self.has_blocks.insert(cid, true);
             Ok(())
         }
 
-        async fn has_block(&self, cid: &Cid) -> Result<bool> {
+        async fn has_block(&self, cid: &Cid) -> Result<bool, BlockStoreError> {
             self.has_blocks
                 .get_or_insert_async(cid, self.inner.has_block(cid))
                 .await
+        }
+
+        async fn put_block(
+            &self,
+            bytes: impl Into<Bytes> + CondSend,
+            codec: u64,
+        ) -> Result<Cid, BlockStoreError> {
+            let cid = self.inner.put_block(bytes, codec).await?;
+            self.has_blocks.insert(cid, true);
+            Ok(cid)
+        }
+
+        fn create_cid(&self, bytes: &[u8], codec: u64) -> Result<Cid, BlockStoreError> {
+            self.inner.create_cid(bytes, codec)
         }
     }
 
@@ -293,7 +317,7 @@ mod tests {
     use libipld::{cbor::DagCborCodec, Cid, Ipld, IpldCodec};
     use std::{collections::HashMap, sync::RwLock};
     use testresult::TestResult;
-    use wnfs_common::{encode, BlockStore, MemoryBlockStore};
+    use wnfs_common::{encode, BlockStore, BlockStoreError, MemoryBlockStore};
 
     #[derive(Debug, Default)]
     struct HashMapCache {
@@ -301,11 +325,18 @@ mod tests {
     }
 
     impl Cache for HashMapCache {
-        async fn get_references_cache(&self, cid: Cid) -> Result<Option<Vec<Cid>>> {
+        async fn get_references_cache(
+            &self,
+            cid: Cid,
+        ) -> Result<Option<Vec<Cid>>, BlockStoreError> {
             Ok(self.references.read().unwrap().get(&cid).cloned())
         }
 
-        async fn put_references_cache(&self, cid: Cid, references: Vec<Cid>) -> Result<()> {
+        async fn put_references_cache(
+            &self,
+            cid: Cid,
+            references: Vec<Cid>,
+        ) -> Result<(), BlockStoreError> {
             self.references.write().unwrap().insert(cid, references);
             Ok(())
         }

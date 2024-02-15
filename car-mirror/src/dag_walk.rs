@@ -35,9 +35,7 @@ impl TraversedItem {
     pub fn to_cid(self) -> Result<Cid, Error> {
         match self {
             Self::Have(cid) => Ok(cid),
-            Self::Missing(cid) => Err(Error::BlockStoreError(
-                BlockStoreError::CIDNotFound(cid).into(),
-            )),
+            Self::Missing(cid) => Err(Error::BlockStoreError(BlockStoreError::CIDNotFound(cid))),
         }
     }
 }

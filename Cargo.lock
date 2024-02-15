@@ -2570,12 +2570,13 @@ checksum = "dff9641d1cd4be8d1a070daf9e3773c5f67e78b4d9d42263020c057706765c04"
 [[package]]
 name = "wnfs-common"
 version = "0.1.26"
-source = "git+https://github.com/wnfs-wg/rs-wnfs?branch=matheus23/evolve-trait#adc78239d7c9351f21ea33d8a6a14a77e5d8213d"
+source = "git+https://github.com/wnfs-wg/rs-wnfs?branch=matheus23/evolve-trait#3e2ae56bb1f54cba75968ff189ef81c3442640ac"
 dependencies = [
  "anyhow",
  "async-once-cell",
  "bytes",
  "chrono",
+ "cid",
  "dashmap",
  "futures",
  "libipld",

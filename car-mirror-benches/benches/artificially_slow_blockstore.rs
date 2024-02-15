@@ -9,7 +9,7 @@ use car_mirror::{
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use libipld::Cid;
 use std::time::Duration;
-use wnfs_common::{utils::CondSend, BlockStore, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, BlockStoreError, MemoryBlockStore};
 
 pub fn push_throttled(c: &mut Criterion) {
     let mut rvg = car_mirror::test_utils::Rvg::deterministic();
@@ -116,20 +116,28 @@ pub fn pull_throttled(c: &mut Criterion) {
 struct ThrottledBlockStore(MemoryBlockStore);
 
 impl BlockStore for ThrottledBlockStore {
-    async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
+    async fn get_block(&self, cid: &Cid) -> Result<Bytes, BlockStoreError> {
         async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
         self.0.get_block(cid).await
     }
 
-    async fn put_block(&self, bytes: impl Into<Bytes> + CondSend, codec: u64) -> Result<Cid> {
+    async fn put_block(
+        &self,
+        bytes: impl Into<Bytes> + CondSend,
+        codec: u64,
+    ) -> Result<Cid, BlockStoreError> {
         self.0.put_block(bytes, codec).await
     }
 
-    async fn put_block_keyed(&self, cid: Cid, bytes: impl Into<Bytes> + CondSend) -> Result<()> {
+    async fn put_block_keyed(
+        &self,
+        cid: Cid,
+        bytes: impl Into<Bytes> + CondSend,
+    ) -> Result<(), BlockStoreError> {
         self.0.put_block_keyed(cid, bytes).await
     }
 
-    async fn has_block(&self, cid: &Cid) -> Result<bool> {
+    async fn has_block(&self, cid: &Cid) -> Result<bool, BlockStoreError> {
         async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
         self.0.has_block(cid).await
     }
