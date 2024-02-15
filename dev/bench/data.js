@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1707758185157,
+  "lastUpdate": 1708025106127,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -473,6 +473,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 850255550,
             "range": "± 4605946",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "370fd83c0117a91cd3f33fca2efd200769657572",
+          "message": "refactor: Take `impl BlockStore` instead of `&impl BlockStore` in general (#40)\n\nAlso:\r\n- Remove `async_trait`\r\n- Expose blanket `impl<C: Cache> Cache for &C` and `Box<C>`\r\n- Move the `trait` module to `cache`\r\n- Remove `has_block` from `trait Cache`\r\n- Add a blockstore wrapper utility `CacheMissing` under the `quick_cache` feature\r\n\r\n---\r\n\r\n* refactor: Remove `async_trait` dependency\r\n\r\n* refactor: Use `impl Trait` instead of `&impl Trait` everywhere\r\n\r\n* chore: Allow wnfs-wg git dependencies\r\n\r\n* refactor: Blanket impl `Cache` for `&C` and `Box<C>`\r\n\r\nInstead of blanket-implementing for all `Deref` types.\r\n\r\nThis makes error messages better & is generally seems to be the soft consensus.\r\n\r\n* refactor: Use newer `BlockStore` trait methods\r\n\r\n* feat: Implement `CacheMissing` blockstore wrapper\r\n\r\n* feat: Use new error types for `BlockStoreError`\r\n\r\n* chore: Fix lint\r\n\r\n* chore: Update to released wnfs version 0.2.0",
+          "timestamp": "2024-02-15T20:22:44+01:00",
+          "tree_id": "ae4680f77f9ffc00f19c76f89bf8a75bbb7a0c6d",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/370fd83c0117a91cd3f33fca2efd200769657572"
+        },
+        "date": 1708025105175,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22534148,
+            "range": "± 515884",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22599889,
+            "range": "± 451536",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 4927908,
+            "range": "± 63612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 4935647,
+            "range": "± 153329",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443943885,
+            "range": "± 2091548",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464886595,
+            "range": "± 2248060",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781306113,
+            "range": "± 5665842",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 849130391,
+            "range": "± 4643210",
             "unit": "ns/iter"
           }
         ]
