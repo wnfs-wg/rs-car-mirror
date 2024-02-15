@@ -2569,8 +2569,9 @@ checksum = "dff9641d1cd4be8d1a070daf9e3773c5f67e78b4d9d42263020c057706765c04"
 
 [[package]]
 name = "wnfs-common"
-version = "0.1.26"
-source = "git+https://github.com/wnfs-wg/rs-wnfs?branch=matheus23/evolve-trait#3e2ae56bb1f54cba75968ff189ef81c3442640ac"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b281a9ecccc4d450fae5e5d1b3f31d28dbdcae1e9e8c9b6233a75d7374ef4f3"
 dependencies = [
  "anyhow",
  "async-once-cell",
