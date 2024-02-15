@@ -75,14 +75,10 @@ impl DagWalk {
 
     fn frontier_next(&mut self) -> Option<Cid> {
         loop {
-            let popped = if self.breadth_first {
-                self.frontier.pop_back()
+            let cid = if self.breadth_first {
+                self.frontier.pop_back()?
             } else {
-                self.frontier.pop_front()
-            };
-
-            let Some(cid) = popped else {
-                return None;
+                self.frontier.pop_front()?
             };
 
             // We loop until we find an unvisited block
