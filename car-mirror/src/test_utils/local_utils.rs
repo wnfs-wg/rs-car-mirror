@@ -1,6 +1,6 @@
 ///! Crate-local test utilities
 use super::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore, Rvg};
-use crate::{common::references, dag_walk::DagWalk, error::Error, traits::NoCache};
+use crate::{cache::NoCache, common::references, dag_walk::DagWalk, error::Error};
 use anyhow::Result;
 use futures::TryStreamExt;
 use libipld::{Cid, Ipld};

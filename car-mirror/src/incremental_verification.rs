@@ -1,8 +1,8 @@
 use crate::{
+    cache::Cache,
     common::ReceiverState,
     dag_walk::{DagWalk, TraversedItem},
     error::{Error, IncrementalVerificationError},
-    traits::Cache,
 };
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;

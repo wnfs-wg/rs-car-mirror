@@ -1,4 +1,4 @@
-use crate::{common::references, error::Error, traits::Cache};
+use crate::{cache::Cache, common::references, error::Error};
 use bytes::Bytes;
 use futures::{stream::try_unfold, Stream};
 use libipld_core::cid::Cid;
@@ -201,7 +201,7 @@ impl DagWalk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits::NoCache;
+    use crate::cache::NoCache;
     use futures::TryStreamExt;
     use libipld::{cbor::DagCborCodec, Ipld};
     use testresult::TestResult;
@@ -272,7 +272,7 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::{test_utils::arb_ipld_dag, traits::NoCache};
+    use crate::{cache::NoCache, test_utils::arb_ipld_dag};
     use futures::TryStreamExt;
     use libipld::{
         multihash::{Code, MultihashDigest},

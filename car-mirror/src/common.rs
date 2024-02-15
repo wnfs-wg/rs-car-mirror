@@ -12,11 +12,11 @@ use wnfs_common::{
 };
 
 use crate::{
+    cache::Cache,
     dag_walk::DagWalk,
     error::Error,
     incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{Bloom, PullRequest, PushResponse},
-    traits::Cache,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -578,7 +578,7 @@ impl std::fmt::Debug for ReceiverState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+    use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
     use testresult::TestResult;
     use wnfs_common::MemoryBlockStore;
 

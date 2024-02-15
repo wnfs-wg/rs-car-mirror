@@ -1,10 +1,10 @@
 use anyhow::Result;
 use bytes::Bytes;
 use car_mirror::{
+    cache::{CacheMissing, InMemoryCache},
     common::Config,
     pull, push,
     test_utils::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore},
-    traits::InMemoryCache,
 };
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use libipld::Cid;
@@ -26,10 +26,10 @@ pub fn push_throttled(c: &mut Criterion) {
                 (store, root)
             },
             |(client_store, root)| {
-                let client_store = &ThrottledBlockStore(client_store);
-                let client_cache = &InMemoryCache::new(10_000);
-                let server_store = &ThrottledBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000);
+                let client_store = &CacheMissing::new(100_000, ThrottledBlockStore(client_store));
+                let client_cache = &InMemoryCache::new(100_000);
+                let server_store = &CacheMissing::new(100_000, ThrottledBlockStore::new());
+                let server_cache = &InMemoryCache::new(100_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -80,10 +80,10 @@ pub fn pull_throttled(c: &mut Criterion) {
                 (store, root)
             },
             |(server_store, root)| {
-                let server_store = &ThrottledBlockStore(server_store);
-                let server_cache = &InMemoryCache::new(10_000);
-                let client_store = &ThrottledBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000);
+                let server_store = &CacheMissing::new(100_000, ThrottledBlockStore(server_store));
+                let server_cache = &InMemoryCache::new(100_000);
+                let client_store = &CacheMissing::new(100_000, ThrottledBlockStore::new());
+                let client_cache = &InMemoryCache::new(100_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -130,7 +130,7 @@ impl BlockStore for ThrottledBlockStore {
     }
 
     async fn has_block(&self, cid: &Cid) -> Result<bool> {
-        // The idea is that has_block would be faster than `get_block`, as it should be managed closer to CPU memory
+        async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
         self.0.has_block(cid).await
     }
 }

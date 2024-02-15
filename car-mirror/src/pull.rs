@@ -1,8 +1,8 @@
 use crate::{
+    cache::Cache,
     common::{block_receive, block_send, CarFile, Config, ReceiverState},
     error::Error,
     messages::PullRequest,
-    traits::Cache,
 };
 use libipld::Cid;
 use wnfs_common::BlockStore;
@@ -46,10 +46,10 @@ pub async fn response(
 #[cfg(test)]
 mod tests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_random_dag, Metrics},
-        traits::NoCache,
     };
     use anyhow::Result;
     use futures::TryStreamExt;
@@ -115,10 +115,10 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_blockstore, variable_blocksize_dag},
-        traits::NoCache,
     };
     use futures::TryStreamExt;
     use libipld::{Cid, Ipld};
