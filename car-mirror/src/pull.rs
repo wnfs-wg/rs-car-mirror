@@ -1,8 +1,8 @@
 use crate::{
+    cache::Cache,
     common::{block_receive, block_send, CarFile, Config, ReceiverState},
     error::Error,
     messages::PullRequest,
-    traits::Cache,
 };
 use libipld::Cid;
 use wnfs_common::BlockStore;
@@ -17,13 +17,14 @@ use wnfs_common::BlockStore;
 ///
 /// Before actually sending the request over the network,
 /// make sure to check the `request.indicates_finished()`.
-/// If true, the client already has all data.
+/// If true, the client already has all data and the request
+/// doesn't need to be sent.
 pub async fn request(
     root: Cid,
     last_response: Option<CarFile>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<PullRequest, Error> {
     Ok(block_receive(root, last_response, config, store, cache)
         .await?
@@ -35,8 +36,8 @@ pub async fn response(
     root: Cid,
     request: PullRequest,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let receiver_state = Some(ReceiverState::from(request));
     block_send(root, receiver_state, config, store, cache).await
@@ -45,10 +46,10 @@ pub async fn response(
 #[cfg(test)]
 mod tests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_random_dag, Metrics},
-        traits::NoCache,
     };
     use anyhow::Result;
     use futures::TryStreamExt;
@@ -68,7 +69,7 @@ mod tests {
         loop {
             let request_bytes = serde_ipld_dagcbor::to_vec(&request)?.len();
             let response =
-                crate::pull::response(root, request, config, server_store, &NoCache).await?;
+                crate::pull::response(root, request, config, server_store, NoCache).await?;
             let response_bytes = response.bytes.len();
 
             metrics.push(Metrics {
@@ -96,10 +97,12 @@ mod tests {
         // client should have all data
         let client_cids = DagWalk::breadth_first([root])
             .stream(client_store, &NoCache)
+            .and_then(|item| async move { item.to_cid() })
             .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
             .stream(server_store, &NoCache)
+            .and_then(|item| async move { item.to_cid() })
             .try_collect::<HashSet<_>>()
             .await?;
 
@@ -112,10 +115,10 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_blockstore, variable_blocksize_dag},
-        traits::NoCache,
     };
     use futures::TryStreamExt;
     use libipld::{Cid, Ipld};
@@ -142,11 +145,13 @@ mod proptests {
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
                 .stream(client_store, &NoCache)
+                .and_then(|item| async move { item.to_cid() })
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
                 .stream(server_store, &NoCache)
+                .and_then(|item| async move { item.to_cid() })
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();

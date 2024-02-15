@@ -9,6 +9,8 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "test_utils")))]
 pub mod test_utils;
 
+/// Module with local caching strategies and mechanisms that greatly enhance CAR mirror performance
+pub mod cache;
 /// Common utilities
 pub mod common;
 /// Algorithms for walking IPLD directed acyclic graphs
@@ -23,5 +25,3 @@ pub mod messages;
 pub mod pull;
 /// The CAR mirror push protocol. Meant to be used qualified, i.e. `push::request` and `push::response`
 pub mod push;
-/// Traits defined in this crate
-pub mod traits;

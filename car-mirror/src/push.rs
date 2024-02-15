@@ -1,8 +1,8 @@
 use crate::{
+    cache::Cache,
     common::{block_receive, block_send, CarFile, Config, ReceiverState},
     error::Error,
     messages::PushResponse,
-    traits::Cache,
 };
 use libipld_core::cid::Cid;
 use wnfs_common::BlockStore;
@@ -21,8 +21,8 @@ pub async fn request(
     root: Cid,
     last_response: Option<PushResponse>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let receiver_state = last_response.map(ReceiverState::from);
     block_send(root, receiver_state, config, store, cache).await
@@ -40,8 +40,8 @@ pub async fn response(
     root: Cid,
     request: CarFile,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<PushResponse, Error> {
     Ok(block_receive(root, Some(request), config, store, cache)
         .await?
@@ -51,13 +51,13 @@ pub async fn response(
 #[cfg(test)]
 mod tests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{
             get_cid_at_approx_path, setup_random_dag, total_dag_blocks, total_dag_bytes, Metrics,
             Rvg,
         },
-        traits::NoCache,
     };
     use anyhow::Result;
     use futures::TryStreamExt;
@@ -105,10 +105,12 @@ mod tests {
         // receiver should have all data
         let client_cids = DagWalk::breadth_first([root])
             .stream(client_store, &NoCache)
+            .and_then(|item| async move { item.to_cid() })
             .try_collect::<HashSet<_>>()
             .await?;
         let server_cids = DagWalk::breadth_first([root])
             .stream(server_store, &NoCache)
+            .and_then(|item| async move { item.to_cid() })
             .try_collect::<HashSet<_>>()
             .await?;
 
@@ -186,10 +188,10 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use crate::{
+        cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
         test_utils::{setup_blockstore, variable_blocksize_dag},
-        traits::NoCache,
     };
     use futures::TryStreamExt;
     use libipld::{Cid, Ipld};
@@ -216,11 +218,13 @@ mod proptests {
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
                 .stream(client_store, &NoCache)
+                .and_then(|item| async move { item.to_cid() })
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();
             let server_cids = DagWalk::breadth_first([root])
                 .stream(server_store, &NoCache)
+                .and_then(|item| async move { item.to_cid() })
                 .try_collect::<HashSet<_>>()
                 .await
                 .unwrap();

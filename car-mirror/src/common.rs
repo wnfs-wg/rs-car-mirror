@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
@@ -12,11 +12,11 @@ use wnfs_common::{
 };
 
 use crate::{
+    cache::Cache,
     dag_walk::DagWalk,
     error::Error,
     incremental_verification::{BlockState, IncrementalDagVerification},
     messages::{Bloom, PullRequest, PushResponse},
-    traits::Cache,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -72,8 +72,8 @@ pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<CarFile, Error> {
     let bytes = block_send_car_stream(
         root,
@@ -94,13 +94,13 @@ pub async fn block_send(
 ///
 /// It uses the car file format for framing blocks & CIDs in the given `AsyncWrite`.
 #[instrument(skip_all, fields(root, last_state))]
-pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
+pub async fn block_send_car_stream<W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
     stream: W,
     send_limit: Option<usize>,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<W, Error> {
     let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
     write_blocks_into_car(stream, &mut block_stream, send_limit).await
@@ -111,8 +111,8 @@ pub async fn block_send_car_stream<'a, W: tokio::io::AsyncWrite + Unpin + Send>(
 pub async fn block_send_block_stream<'a>(
     root: Cid,
     last_state: Option<ReceiverState>,
-    store: &'a impl BlockStore,
-    cache: &'a impl Cache,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
 ) -> Result<BlockStream<'a>, Error> {
     let ReceiverState {
         missing_subgraph_roots,
@@ -124,7 +124,7 @@ pub async fn block_send_block_stream<'a>(
 
     // Verify that all missing subgraph roots are in the relevant DAG:
     let subgraph_roots =
-        verify_missing_subgraph_roots(root, &missing_subgraph_roots, store, cache).await?;
+        verify_missing_subgraph_roots(root, &missing_subgraph_roots, &store, &cache).await?;
 
     let bloom = handle_missing_bloom(have_cids_bloom);
 
@@ -146,8 +146,8 @@ pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
     let mut receiver_state = match last_car {
         Some(car) => {
@@ -160,7 +160,7 @@ pub async fn block_receive(
 
             block_receive_car_stream(root, Cursor::new(car.bytes), config, store, cache).await?
         }
-        None => IncrementalDagVerification::new([root], store, cache)
+        None => IncrementalDagVerification::new([root], &store, &cache)
             .await?
             .into_receiver_state(config.bloom_fpr),
     };
@@ -178,8 +178,8 @@ pub async fn block_receive_car_stream<R: tokio::io::AsyncRead + Unpin + CondSend
     root: Cid,
     reader: R,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
     let reader = CarReader::new(reader).await?;
 
@@ -199,13 +199,13 @@ pub async fn block_receive_block_stream(
     root: Cid,
     stream: &mut BlockStream<'_>,
     config: &Config,
-    store: &impl BlockStore,
-    cache: &impl Cache,
+    store: impl BlockStore,
+    cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
-    let mut dag_verification = IncrementalDagVerification::new([root], store, cache).await?;
+    let mut dag_verification = IncrementalDagVerification::new([root], &store, &cache).await?;
 
     while let Some((cid, block)) = stream.try_next().await? {
-        match read_and_verify_block(&mut dag_verification, (cid, block), store, cache).await? {
+        match read_and_verify_block(&mut dag_verification, (cid, block), &store, &cache).await? {
             BlockState::Have => {
                 // This can happen because we've just discovered a subgraph we already have.
                 // Let's update the endpoint with our new receiver state.
@@ -308,6 +308,8 @@ async fn car_frame_from_block(block: (Cid, Bytes)) -> Result<Bytes, Error> {
     Ok(bytes.into())
 }
 
+/// Ensure that any requested subgraph roots are actually part
+/// of the DAG from the root.
 async fn verify_missing_subgraph_roots(
     root: Cid,
     missing_subgraph_roots: &[Cid],
@@ -316,9 +318,10 @@ async fn verify_missing_subgraph_roots(
 ) -> Result<Vec<Cid>, Error> {
     let subgraph_roots: Vec<Cid> = DagWalk::breadth_first([root])
         .stream(store, cache)
-        .try_filter_map(
-            |cid| async move { Ok(missing_subgraph_roots.contains(&cid).then_some(cid)) },
-        )
+        .try_filter_map(|item| async move {
+            let cid = item.to_cid()?;
+            Ok(missing_subgraph_roots.contains(&cid).then_some(cid))
+        })
         .try_collect()
         .await?;
 
@@ -356,23 +359,24 @@ fn handle_missing_bloom(have_cids_bloom: Option<BloomFilter>) -> BloomFilter {
 fn stream_blocks_from_roots<'a>(
     subgraph_roots: Vec<Cid>,
     bloom: BloomFilter,
-    store: &'a impl BlockStore,
-    cache: &'a impl Cache,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
 ) -> BlockStream<'a> {
-    Box::pin(
-        DagWalk::breadth_first(subgraph_roots.clone())
-            .stream(store, cache)
-            .try_filter(move |cid| {
-                future::ready(!should_block_be_skipped(cid, &bloom, &subgraph_roots))
-            })
-            .and_then(move |cid| async move {
-                let bytes = store
-                    .get_block(&cid)
-                    .await
-                    .map_err(Error::BlockStoreError)?;
-                Ok((cid, bytes))
-            }),
-    )
+    Box::pin(async_stream::try_stream! {
+        let mut dag_walk = DagWalk::breadth_first(subgraph_roots.clone());
+
+        while let Some(item) = dag_walk.next(&store, &cache).await? {
+            let cid = item.to_cid()?;
+
+            if should_block_be_skipped(&cid, &bloom, &subgraph_roots) {
+                continue;
+            }
+
+            let bytes = store.get_block(&cid).await.map_err(Error::BlockStoreError)?;
+
+            yield (cid, bytes);
+        }
+    })
 }
 
 async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
@@ -574,7 +578,7 @@ impl std::fmt::Debug for ReceiverState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_utils::assert_cond_send_sync, traits::NoCache};
+    use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
     use testresult::TestResult;
     use wnfs_common::MemoryBlockStore;
 
@@ -585,8 +589,8 @@ mod tests {
                 unimplemented!(),
                 unimplemented!(),
                 unimplemented!(),
-                unimplemented!() as &MemoryBlockStore,
-                &NoCache,
+                unimplemented!() as MemoryBlockStore,
+                NoCache,
             )
         });
         assert_cond_send_sync(|| {

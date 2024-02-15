@@ -1,16 +1,15 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use bytes::Bytes;
 use car_mirror::{
+    cache::{CacheMissing, InMemoryCache},
     common::Config,
     pull, push,
     test_utils::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore},
-    traits::InMemoryCache,
 };
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use libipld::Cid;
 use std::time::Duration;
-use wnfs_common::{utils::CondSend, BlockStore, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, BlockStoreError, MemoryBlockStore};
 
 pub fn push_throttled(c: &mut Criterion) {
     let mut rvg = car_mirror::test_utils::Rvg::deterministic();
@@ -27,17 +26,25 @@ pub fn push_throttled(c: &mut Criterion) {
                 (store, root)
             },
             |(client_store, root)| {
-                let client_store = &ThrottledBlockStore(client_store);
-                let client_cache = &InMemoryCache::new(10_000, 150_000);
-                let server_store = &ThrottledBlockStore::new();
-                let server_cache = &InMemoryCache::new(10_000, 150_000);
+                let client_store = &CacheMissing::new(100_000, ThrottledBlockStore(client_store));
+                let client_cache = &InMemoryCache::new(100_000);
+                let server_store = &CacheMissing::new(100_000, ThrottledBlockStore::new());
+                let server_cache = &InMemoryCache::new(100_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
                 async_std::task::block_on(async move {
-                    let mut request =
-                        push::request(root, None, config, client_store, client_cache).await?;
+                    let mut last_response = None;
                     loop {
+                        let request = push::request(
+                            root,
+                            last_response,
+                            config,
+                            client_store.clone(),
+                            client_cache.clone(),
+                        )
+                        .await?;
+
                         let response =
                             push::response(root, request, config, server_store, server_cache)
                                 .await?;
@@ -45,9 +52,8 @@ pub fn push_throttled(c: &mut Criterion) {
                         if response.indicates_finished() {
                             break;
                         }
-                        request =
-                            push::request(root, Some(response), config, client_store, client_cache)
-                                .await?;
+
+                        last_response = Some(response);
                     }
 
                     Ok::<(), anyhow::Error>(())
@@ -74,10 +80,10 @@ pub fn pull_throttled(c: &mut Criterion) {
                 (store, root)
             },
             |(server_store, root)| {
-                let server_store = &ThrottledBlockStore(server_store);
-                let server_cache = &InMemoryCache::new(10_000, 150_000);
-                let client_store = &ThrottledBlockStore::new();
-                let client_cache = &InMemoryCache::new(10_000, 150_000);
+                let server_store = &CacheMissing::new(100_000, ThrottledBlockStore(server_store));
+                let server_cache = &InMemoryCache::new(100_000);
+                let client_store = &CacheMissing::new(100_000, ThrottledBlockStore::new());
+                let client_cache = &InMemoryCache::new(100_000);
                 let config = &Config::default();
 
                 // Simulate a multi-round protocol run in-memory
@@ -109,17 +115,31 @@ pub fn pull_throttled(c: &mut Criterion) {
 #[derive(Debug, Clone)]
 struct ThrottledBlockStore(MemoryBlockStore);
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl BlockStore for ThrottledBlockStore {
-    async fn get_block(&self, cid: &Cid) -> Result<Bytes> {
-        let bytes = self.0.get_block(cid).await?;
+    async fn get_block(&self, cid: &Cid) -> Result<Bytes, BlockStoreError> {
         async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
-        Ok(bytes)
+        self.0.get_block(cid).await
     }
 
-    async fn put_block(&self, bytes: impl Into<Bytes> + CondSend, codec: u64) -> Result<Cid> {
+    async fn put_block(
+        &self,
+        bytes: impl Into<Bytes> + CondSend,
+        codec: u64,
+    ) -> Result<Cid, BlockStoreError> {
         self.0.put_block(bytes, codec).await
+    }
+
+    async fn put_block_keyed(
+        &self,
+        cid: Cid,
+        bytes: impl Into<Bytes> + CondSend,
+    ) -> Result<(), BlockStoreError> {
+        self.0.put_block_keyed(cid, bytes).await
+    }
+
+    async fn has_block(&self, cid: &Cid) -> Result<bool, BlockStoreError> {
+        async_std::task::sleep(Duration::from_micros(50)).await; // Block fetching is artifically slowed by 50 microseconds
+        self.0.has_block(cid).await
     }
 }
 

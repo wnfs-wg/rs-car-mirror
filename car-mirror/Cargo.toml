@@ -18,23 +18,23 @@ path = "src/lib.rs"
 doctest = true
 
 [dependencies]
-anyhow = "1.0"
-async-trait = "0.1.73"
-bytes = "1.4"
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+bytes = { workspace = true }
 deterministic-bloom = "0.1"
-futures = "0.3"
+futures = { workspace = true }
 iroh-car = "0.4"
-libipld = "0.16"
-libipld-core = "0.16"
+libipld = { workspace = true }
+libipld-core = { workspace = true }
 proptest = { version = "1.1", optional = true }
 quick_cache = { version = "0.4", optional = true }
 roaring-graphs = { version = "0.12", optional = true }
 serde = "^1"
-serde_ipld_dagcbor = "0.4"
+serde_ipld_dagcbor = { workspace = true }
 thiserror = "1.0"
 tokio = { version = "^1", default-features = false }
 tracing = "0.1"
-wnfs-common = "0.1.26"
+wnfs-common = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.11", features = ["attributes"] }

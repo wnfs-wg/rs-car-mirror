@@ -1,4 +1,5 @@
 use libipld::Cid;
+use wnfs_common::BlockStoreError;
 
 use crate::incremental_verification::BlockState;
 
@@ -31,17 +32,9 @@ pub enum Error {
         cid: Cid,
     },
 
-    /// This error is raised when the hash function that the `BlockStore` uses a different hashing function
-    /// than the blocks which are received over the wire.
-    /// This error will be removed in the future, when the block store trait gets modified to support specifying
-    /// the hash function.
-    #[error("BlockStore uses an incompatible hashing function: CID mismatched, expected {cid}, got {actual_cid}")]
-    BlockStoreIncompatible {
-        /// The expected CID
-        cid: Box<Cid>,
-        /// The CID returned from the BlockStore implementation
-        actual_cid: Box<Cid>,
-    },
+    /// An error rasied from the blockstore.
+    #[error("BlockStore error: {0}")]
+    BlockStoreError(#[from] BlockStoreError),
 
     // -------------
     // Anyhow Errors
@@ -49,10 +42,6 @@ pub enum Error {
     /// An error raised when trying to parse a block (e.g. to look for further links)
     #[error("Error during block parsing: {0}")]
     ParsingError(anyhow::Error),
-
-    /// An error rasied from the blockstore.
-    #[error("BlockStore error: {0}")]
-    BlockStoreError(anyhow::Error),
 
     // ----------
     // Sub-errors
