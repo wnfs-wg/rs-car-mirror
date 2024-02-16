@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1708025106127,
+  "lastUpdate": 1708075394251,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -545,6 +545,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 849130391,
             "range": "± 4643210",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bb5a166b80108de4d92c773020fab729bc47226a",
+          "message": "refactor: Expose `CacheMissing::inner` field (#41)",
+          "timestamp": "2024-02-16T10:20:55+01:00",
+          "tree_id": "595fa65f834fddade27e1d264203f6d421a4abe2",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/bb5a166b80108de4d92c773020fab729bc47226a"
+        },
+        "date": 1708075393697,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22825786,
+            "range": "± 546153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22556543,
+            "range": "± 502607",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 5044054,
+            "range": "± 124874",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 5032343,
+            "range": "± 116819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443895936,
+            "range": "± 2087134",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464821130,
+            "range": "± 2204641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781320002,
+            "range": "± 5652835",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 849323427,
+            "range": "± 4693128",
             "unit": "ns/iter"
           }
         ]
