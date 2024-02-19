@@ -1,11 +1,12 @@
 use crate::{
     cache::Cache,
-    common::{block_receive, block_send, CarFile, Config, ReceiverState},
+    common::{block_receive, block_receive_car_stream, block_send, CarFile, Config, ReceiverState},
     error::Error,
     messages::PullRequest,
 };
 use libipld::Cid;
-use wnfs_common::BlockStore;
+use tokio::io::AsyncRead;
+use wnfs_common::{utils::CondSend, BlockStore};
 
 /// Create a CAR mirror pull request.
 ///
@@ -27,6 +28,19 @@ pub async fn request(
     cache: impl Cache,
 ) -> Result<PullRequest, Error> {
     Ok(block_receive(root, last_response, config, store, cache)
+        .await?
+        .into())
+}
+
+/// TODO(matheus23): DOCS
+pub async fn handle_response_streaming(
+    root: Cid,
+    stream: impl AsyncRead + Unpin + CondSend,
+    config: &Config,
+    store: impl BlockStore,
+    cache: impl Cache,
+) -> Result<PullRequest, Error> {
+    Ok(block_receive_car_stream(root, stream, config, store, cache)
         .await?
         .into())
 }
@@ -66,7 +80,7 @@ mod tests {
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
         let mut request = crate::pull::request(root, None, config, client_store, &NoCache).await?;
-        loop {
+        while !request.indicates_finished() {
             let request_bytes = serde_ipld_dagcbor::to_vec(&request)?.len();
             let response =
                 crate::pull::response(root, request, config, server_store, NoCache).await?;
@@ -79,9 +93,6 @@ mod tests {
 
             request =
                 crate::pull::request(root, Some(response), config, client_store, &NoCache).await?;
-            if request.indicates_finished() {
-                break;
-            }
         }
 
         Ok(metrics)

@@ -1,11 +1,6 @@
 use crate::Error;
 use anyhow::Result;
-use car_mirror::{
-    cache::Cache,
-    common::Config,
-    incremental_verification::IncrementalDagVerification,
-    messages::{PullRequest, PushResponse},
-};
+use car_mirror::{cache::Cache, common::Config, messages::PullRequest};
 use futures::{Future, TryStreamExt};
 use libipld::Cid;
 use reqwest::{Body, Response, StatusCode};
@@ -169,14 +164,9 @@ where
     let mut push_state = None;
 
     loop {
-        let block_stream = car_mirror::common::block_send_block_stream(
-            root,
-            push_state,
-            store.clone(),
-            cache.clone(),
-        )
-        .await?;
-        let car_stream = car_mirror::common::stream_car_frames(block_stream).await?;
+        let car_stream =
+            car_mirror::push::request_streaming(root, push_state, store.clone(), cache.clone())
+                .await?;
         let reqwest_stream = Body::wrap_stream(car_stream);
 
         let response = make_request(reqwest_stream).await?.error_for_status()?;
@@ -194,8 +184,7 @@ where
             }
         }
 
-        let response: PushResponse = response.json().await?;
-        push_state = Some(response.into());
+        push_state = Some(response.json().await?);
     }
 }
 
@@ -218,10 +207,7 @@ where
     E: From<car_mirror::Error>,
     E: From<reqwest::Error>,
 {
-    let mut pull_request: PullRequest = IncrementalDagVerification::new([root], &store, &cache)
-        .await?
-        .into_receiver_state(config.bloom_fpr)
-        .into();
+    let mut pull_request = car_mirror::pull::request(root, None, config, store, cache).await?;
 
     while !pull_request.indicates_finished() {
         let answer = make_request(pull_request).await?.error_for_status()?;
@@ -229,9 +215,7 @@ where
         let stream = StreamReader::new(answer.bytes_stream().map_err(std::io::Error::other));
 
         pull_request =
-            car_mirror::common::block_receive_car_stream(root, stream, config, store, cache)
-                .await?
-                .into();
+            car_mirror::pull::handle_response_streaming(root, stream, config, store, cache).await?;
     }
 
     Ok(())

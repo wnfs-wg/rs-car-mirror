@@ -56,6 +56,10 @@ pub struct CarFile {
 /// A stream of blocks. This requires the underlying futures to be `Send`, except when the target is `wasm32`.
 pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 
+/// A stream of byte chunks of a CAR file.
+/// The underlying futures are `Send`, except when the target is `wasm32`.
+pub type CarStream<'a> = BoxStream<'a, Result<Bytes, Error>>;
+
 //--------------------------------------------------------------------------------------------------
 // Functions
 //--------------------------------------------------------------------------------------------------
@@ -97,13 +101,13 @@ pub async fn block_send(
 pub async fn block_send_car_stream<W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
-    stream: W,
+    writer: W,
     send_limit: Option<usize>,
     store: impl BlockStore,
     cache: impl Cache,
 ) -> Result<W, Error> {
     let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
-    write_blocks_into_car(stream, &mut block_stream, send_limit).await
+    write_blocks_into_car(writer, &mut block_stream, send_limit).await
 }
 
 /// This is the car mirror block sending function, but unlike `block_send_car_stream`
@@ -239,9 +243,7 @@ pub async fn block_receive_block_stream(
 /// The frame boundaries are after the header section and between each block.
 ///
 /// The first frame will always be a CAR file header frame.
-pub async fn stream_car_frames(
-    mut blocks: BlockStream<'_>,
-) -> Result<BoxStream<'_, Result<Bytes, Error>>, Error> {
+pub async fn stream_car_frames(mut blocks: BlockStream<'_>) -> Result<CarStream<'_>, Error> {
     // https://github.com/wnfs-wg/car-mirror-spec/issues/6
     // CAR files *must* have at least one CID in them, and all of them
     // need to appear as a block in the payload.

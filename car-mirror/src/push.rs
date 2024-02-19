@@ -1,6 +1,9 @@
 use crate::{
     cache::Cache,
-    common::{block_receive, block_send, CarFile, Config, ReceiverState},
+    common::{
+        block_receive, block_send, block_send_block_stream, stream_car_frames, CarFile, CarStream,
+        Config, ReceiverState,
+    },
     error::Error,
     messages::PushResponse,
 };
@@ -26,6 +29,19 @@ pub async fn request(
 ) -> Result<CarFile, Error> {
     let receiver_state = last_response.map(ReceiverState::from);
     block_send(root, receiver_state, config, store, cache).await
+}
+
+/// TODO(matheus23): DOCS
+pub async fn request_streaming<'a>(
+    root: Cid,
+    last_response: Option<PushResponse>,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
+) -> Result<CarStream<'a>, Error> {
+    let receiver_state = last_response.map(|s| s.into());
+    let block_stream = block_send_block_stream(root, receiver_state, store, cache).await?;
+    let car_stream = stream_car_frames(block_stream).await?;
+    Ok(car_stream)
 }
 
 /// Create a response for a CAR mirror push request.
