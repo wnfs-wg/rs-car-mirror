@@ -16,7 +16,7 @@ pub mod common;
 /// Algorithms for walking IPLD directed acyclic graphs
 pub mod dag_walk;
 /// Error types
-pub mod error;
+mod error;
 /// Algorithms for doing incremental verification of IPLD DAGs on the receiving end.
 pub mod incremental_verification;
 /// Data types that are sent over-the-wire and relevant serialization code.
@@ -25,3 +25,5 @@ pub mod messages;
 pub mod pull;
 /// The CAR mirror push protocol. Meant to be used qualified, i.e. `push::request` and `push::response`
 pub mod push;
+
+pub use error::*;

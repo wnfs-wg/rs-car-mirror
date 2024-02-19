@@ -1,0 +1,238 @@
+use crate::Error;
+use anyhow::Result;
+use car_mirror::{
+    cache::Cache,
+    common::Config,
+    incremental_verification::IncrementalDagVerification,
+    messages::{PullRequest, PushResponse},
+};
+use futures::{Future, TryStreamExt};
+use libipld::Cid;
+use reqwest::{Body, Response, StatusCode};
+use tokio_util::io::StreamReader;
+use wnfs_common::BlockStore;
+
+/// Extension methods on `RequestBuilder`s for sending car mirror protocol requests.
+pub trait RequestBuilderExt {
+    /// Initiate a car mirror push request to send some data to the
+    /// server via HTTP.
+    ///
+    /// Repeats this request until the car mirror protocol is finished.
+    ///
+    /// The `root` is the CID of the DAG root that should be made fully
+    /// present on the server side at the end of the protocol.
+    ///
+    /// The full DAG under `root` needs to be available in the local
+    /// blockstore `store`.
+    ///
+    /// `cache` is used to reduce costly `store` lookups and computations
+    /// regarding which blocks still need to be transferred.
+    ///
+    /// This will call `try_clone()` and `send()` on this
+    /// request builder, so it must not have a `body` set yet.
+    /// There is no need to set a body, this function will do so automatically.
+    ///
+    /// `store` and `cache` need to be references to `Clone`-able types
+    /// which don't borrow data, because of the way request streaming
+    /// lifetimes work with `reqwest`.
+    /// Usually blockstores and caches satisfy these conditions due to
+    /// using atomic reference counters.
+    fn send_car_mirror_push(
+        &self,
+        root: Cid,
+        store: &(impl BlockStore + Clone + 'static),
+        cache: &(impl Cache + Clone + 'static),
+    ) -> impl Future<Output = Result<(), Error>> + Send;
+
+    /// Initiate a car mirror pull request to load some data from
+    /// a server via HTTP.
+    ///
+    /// Repeats the request in rounds, until the car mirror protocol is finished.
+    ///
+    /// The `root` is the CID of the DAG root that should be made fully
+    /// present on the client side at the end of the protocol.
+    ///
+    /// At the end of the protocol, `store` will contain all blocks under `root`.
+    ///
+    /// `cache` is used to reduce costly `store` lookups and computations
+    /// regarding which blocks still need to be transferred.
+    ///
+    /// This will call `try_clone()` and `send()` on this
+    /// request builder, so it must not have a `body` set yet.
+    /// There is no need to set a body, this function will do so automatically.
+    fn send_car_mirror_pull(
+        &self,
+        root: Cid,
+        config: &Config,
+        store: &impl BlockStore,
+        cache: &impl Cache,
+    ) -> impl Future<Output = Result<(), Error>> + Send;
+}
+
+impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
+    async fn send_car_mirror_push(
+        &self,
+        root: Cid,
+        store: &(impl BlockStore + Clone + 'static),
+        cache: &(impl Cache + Clone + 'static),
+    ) -> Result<(), Error> {
+        push_with(root, store, cache, |body| async {
+            Ok::<_, Error>(
+                self.try_clone()
+                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
+                    .body(body)
+                    .send()
+                    .await?,
+            )
+        })
+        .await
+    }
+
+    async fn send_car_mirror_pull(
+        &self,
+        root: Cid,
+        config: &Config,
+        store: &impl BlockStore,
+        cache: &impl Cache,
+    ) -> Result<(), Error> {
+        pull_with(root, config, store, cache, |pull_request| async move {
+            Ok::<_, Error>(
+                self.try_clone()
+                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
+                    .json(&pull_request)
+                    .send()
+                    .await?,
+            )
+        })
+        .await
+    }
+}
+
+impl RequestBuilderExt for reqwest::RequestBuilder {
+    async fn send_car_mirror_push(
+        &self,
+        root: Cid,
+        store: &(impl BlockStore + Clone + 'static),
+        cache: &(impl Cache + Clone + 'static),
+    ) -> Result<(), Error> {
+        push_with(root, store, cache, |body| async {
+            Ok::<_, Error>(
+                self.try_clone()
+                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
+                    .body(body)
+                    .send()
+                    .await?,
+            )
+        })
+        .await
+    }
+
+    async fn send_car_mirror_pull(
+        &self,
+        root: Cid,
+        config: &Config,
+        store: &impl BlockStore,
+        cache: &impl Cache,
+    ) -> Result<(), Error> {
+        pull_with(root, config, store, cache, |pull_request| async move {
+            Ok::<_, Error>(
+                self.try_clone()
+                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
+                    .json(&pull_request)
+                    .send()
+                    .await?,
+            )
+        })
+        .await
+    }
+}
+
+/// Run (possibly multiple rounds of) the car mirror push protocol.
+///
+/// See `send_car_mirror_push` for a more ergonomic interface.
+///
+/// Unlike `send_car_mirror_push`, this allows customizing the
+/// request every time it gets built, e.g. to refresh authentication tokens.
+pub async fn push_with<F, Fut, E>(
+    root: Cid,
+    store: &(impl BlockStore + Clone + 'static),
+    cache: &(impl Cache + Clone + 'static),
+    mut make_request: F,
+) -> Result<(), E>
+where
+    F: FnMut(reqwest::Body) -> Fut,
+    Fut: Future<Output = Result<Response, E>>,
+    E: From<Error>,
+    E: From<car_mirror::Error>,
+    E: From<reqwest::Error>,
+{
+    let mut push_state = None;
+
+    loop {
+        let block_stream = car_mirror::common::block_send_block_stream(
+            root,
+            push_state,
+            store.clone(),
+            cache.clone(),
+        )
+        .await?;
+        let car_stream = car_mirror::common::stream_car_frames(block_stream).await?;
+        let reqwest_stream = Body::wrap_stream(car_stream);
+
+        let response = make_request(reqwest_stream).await?.error_for_status()?;
+
+        match response.status() {
+            StatusCode::OK => {
+                return Ok(());
+            }
+            StatusCode::ACCEPTED => {
+                // We need to continue.
+            }
+            _ => {
+                // Some unexpected response code
+                return Err(Error::UnexpectedStatusCode { response }.into());
+            }
+        }
+
+        let response: PushResponse = response.json().await?;
+        push_state = Some(response.into());
+    }
+}
+
+/// Run (possibly multiple rounds of) the car mirror pull protocol.
+///
+/// See `send_car_mirror_pull` for a more ergonomic interface.
+///
+/// Unlike `send_car_mirror_pull`, this allows customizing the
+/// request every time it gets built, e.g. to refresh authentication tokens.
+pub async fn pull_with<F, Fut, E>(
+    root: Cid,
+    config: &Config,
+    store: &impl BlockStore,
+    cache: &impl Cache,
+    mut make_request: F,
+) -> Result<(), E>
+where
+    F: FnMut(PullRequest) -> Fut,
+    Fut: Future<Output = Result<Response, E>>,
+    E: From<car_mirror::Error>,
+    E: From<reqwest::Error>,
+{
+    let mut pull_request: PullRequest = IncrementalDagVerification::new([root], &store, &cache)
+        .await?
+        .into_receiver_state(config.bloom_fpr)
+        .into();
+
+    while !pull_request.indicates_finished() {
+        let answer = make_request(pull_request).await?.error_for_status()?;
+
+        let stream = StreamReader::new(answer.bytes_stream().map_err(std::io::Error::other));
+
+        pull_request =
+            car_mirror::common::block_receive_car_stream(root, stream, config, store, cache)
+                .await?
+                .into();
+    }
+
+    Ok(())
+}

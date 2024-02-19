@@ -1,7 +1,6 @@
+use crate::incremental_verification::BlockState;
 use libipld::Cid;
 use wnfs_common::BlockStoreError;
-
-use crate::incremental_verification::BlockState;
 
 /// Errors raised from the CAR mirror library
 #[derive(thiserror::Error, Debug)]
@@ -16,7 +15,7 @@ pub enum Error {
         bytes_read: usize,
     },
 
-    /// This library only supports a subset of default codecs, including DAG-CBOR, DAG-JSON, DAG-PB and more.g
+    /// This library only supports a subset of default codecs, including DAG-CBOR, DAG-JSON, DAG-PB and more.
     /// This is raised if an unknown codec is read from a CID. See the `libipld` library for more information.
     #[error("Unsupported codec in Cid: {cid}")]
     UnsupportedCodec {
