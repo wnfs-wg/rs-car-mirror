@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1708075394251,
+  "lastUpdate": 1708533829226,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -617,6 +617,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 849323427,
             "range": "± 4693128",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "206f6d88f9d5fe9a2774b27ca2d7e29c19824831",
+          "message": "feat: Create `car-mirror-reqwest` crate & add high-level streaming functions (#42)\n\n* feat: Initial version of `car-mirror-reqwest` crate\r\n\r\n* feat: High-level streaming push & pull abstractions\r\n\r\n* feat: Add configurable max block size\r\n\r\n* feat: Implement streaming response shortcuts\r\n\r\n* chore: Write documentation\r\n\r\n* refactor: Rename `send_` -> `run_`\r\n\r\n* chore: Improve bloom FPR logging\r\n\r\n* chore: Write documentation for `push` module\r\n\r\n* chore: Write docs for `pull` module & clean up\r\n\r\n* chore: Allow `MPL-2.0` in `deny.toml`\r\n\r\n* chore: Write `axum.rs` example & module docs\r\n\r\n* refactor: Move example to `integration`, run as integration test\r\n\r\n* chore: Remove accidental testing code\r\n\r\n* chore: Run tests for all crates on coverage\r\n\r\n* chore: Write more tests, specifically for error cases",
+          "timestamp": "2024-02-21T17:41:19+01:00",
+          "tree_id": "5baa1aa69a92ad315e3e2e4237faa51440f00913",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/206f6d88f9d5fe9a2774b27ca2d7e29c19824831"
+        },
+        "date": 1708533828647,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22691348,
+            "range": "± 622205",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22626669,
+            "range": "± 531887",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 5219227,
+            "range": "± 123445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 5181611,
+            "range": "± 97204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443884885,
+            "range": "± 2095396",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464811070,
+            "range": "± 2068903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781305282,
+            "range": "± 5640046",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 849283175,
+            "range": "± 4704275",
             "unit": "ns/iter"
           }
         ]
