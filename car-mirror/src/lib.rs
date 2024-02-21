@@ -58,7 +58,7 @@ pub mod messages;
 /// let client_store = MemoryBlockStore::new();
 /// let server_store = MemoryBlockStore::new();
 ///
-/// // Give both peers ~1MB of cache space for speeding up computations.
+/// // Give both peers ~10MB of cache space for speeding up computations.
 /// // These are available under the `quick_cache` feature.
 /// // (You can also implement your own, or disable caches using `NoCache`)
 /// let client_cache = InMemoryCache::new(100_000);
@@ -254,7 +254,7 @@ pub mod pull;
 /// let client_store = MemoryBlockStore::new();
 /// let server_store = MemoryBlockStore::new();
 ///
-/// // Give both peers ~1MB of cache space for speeding up computations.
+/// // Give both peers ~10MB of cache space for speeding up computations.
 /// // These are available under the `quick_cache` feature.
 /// // (You can also implement your own, or disable caches using `NoCache`)
 /// let client_cache = InMemoryCache::new(100_000);

@@ -2,7 +2,42 @@
 #![warn(missing_debug_implementations, missing_docs, rust_2018_idioms)]
 #![deny(unreachable_pub)]
 
-//! A helper library that helps making car-mirror client requests using reqwest
+//! # car-mirror-reqwest
+//!
+//! A helper library that helps making car-mirror client requests using reqwest.
+//!
+//! ```no_run
+//! # use anyhow::Result;
+//! use car_mirror::{cache::NoCache, common::Config};
+//! use car_mirror_reqwest::RequestBuilderExt;
+//! use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_RAW};
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! let store = MemoryBlockStore::new();
+//! let data = b"Hello, world!".to_vec();
+//! let root = store.put_block(data, CODEC_RAW).await?;
+//!
+//! let config = &Config::default();
+//!
+//! let client = reqwest::Client::new();
+//! client
+//!     .post(format!("http://localhost:3344/dag/push/{root}"))
+//!     .run_car_mirror_push(root, &store, &NoCache) // rounds of push protocol
+//!     .await?;
+//!
+//! let store = MemoryBlockStore::new(); // clear out data
+//! client
+//!     .get(format!("http://localhost:3344/dag/pull/{root}"))
+//!     .run_car_mirror_pull(root, config, &store, &NoCache) // rounds of pull protocol
+//!     .await?;
+//!
+//! assert!(store.has_block(&root).await?);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! For the full example, please see `examples/axum.rs` in the source repository.
 
 mod error;
 mod request;
