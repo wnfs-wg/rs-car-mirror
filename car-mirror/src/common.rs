@@ -622,8 +622,9 @@ impl std::fmt::Debug for ReceiverState {
 pub(crate) mod tests {
     use super::*;
     use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
+    use assert_matches::assert_matches;
     use testresult::TestResult;
-    use wnfs_common::MemoryBlockStore;
+    use wnfs_common::{MemoryBlockStore, CODEC_RAW};
 
     #[allow(clippy::unreachable, unused)]
     fn test_assert_send() {
@@ -657,6 +658,63 @@ pub(crate) mod tests {
         let debug_print = format!("{state:#?}");
 
         assert!(debug_print.len() < 1000);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_stream_car_frame_empty() -> TestResult {
+        let car_frames = stream_car_frames(futures::stream::empty().boxed()).await?;
+        let frames: Vec<Bytes> = car_frames.try_collect().await?;
+
+        assert!(frames.is_empty());
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_write_blocks_into_car_empty() -> TestResult {
+        let car_file =
+            write_blocks_into_car(Vec::new(), &mut futures::stream::empty().boxed(), None).await?;
+
+        assert!(car_file.is_empty());
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_block_receive_block_stream_block_size_exceeded() -> TestResult {
+        let store = &MemoryBlockStore::new();
+
+        let block_small: Bytes = b"This one is small".to_vec().into();
+        let block_big: Bytes = b"This one is very very very big".to_vec().into();
+        let root_small = store.put_block(block_small.clone(), CODEC_RAW).await?;
+        let root_big = store.put_block(block_big.clone(), CODEC_RAW).await?;
+
+        let config = &Config {
+            max_block_size: 20,
+            ..Config::default()
+        };
+
+        block_receive_block_stream(
+            root_small,
+            &mut futures::stream::iter(vec![Ok((root_small, block_small))]).boxed(),
+            config,
+            MemoryBlockStore::new(),
+            NoCache,
+        )
+        .await?;
+
+        let result = block_receive_block_stream(
+            root_small,
+            &mut futures::stream::iter(vec![Ok((root_big, block_big))]).boxed(),
+            config,
+            MemoryBlockStore::new(),
+            NoCache,
+        )
+        .await;
+
+        assert_matches!(result, Err(Error::BlockSizeExceeded { .. }));
 
         Ok(())
     }
