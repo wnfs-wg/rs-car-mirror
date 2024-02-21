@@ -619,7 +619,7 @@ impl std::fmt::Debug for ReceiverState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
     use testresult::TestResult;

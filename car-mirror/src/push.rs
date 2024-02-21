@@ -96,8 +96,8 @@ mod tests {
         dag_walk::DagWalk,
         push,
         test_utils::{
-            get_cid_at_approx_path, setup_random_dag, total_dag_blocks, total_dag_bytes, Metrics,
-            Rvg,
+            get_cid_at_approx_path, setup_random_dag, store_test_unixfs, total_dag_blocks,
+            total_dag_bytes, Metrics, Rvg,
         },
     };
     use anyhow::Result;
@@ -108,7 +108,6 @@ mod tests {
     use testresult::TestResult;
     use tokio_util::io::StreamReader;
     use wnfs_common::{BlockStore, MemoryBlockStore};
-    use wnfs_unixfs_file::builder::FileBuilder;
 
     pub(crate) async fn simulate_protocol(
         root: Cid,
@@ -162,42 +161,20 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn test_streaming_transfer() -> TestResult {
-        // We simulate peers having separate data stores
         let client_store = MemoryBlockStore::new();
         let server_store = MemoryBlockStore::new();
 
-        let file_bytes = async_std::fs::read("../Cargo.lock").await?;
-
-        // Load some data onto the client
-        let root = FileBuilder::new()
-            .content_bytes(file_bytes.clone())
-            .fixed_chunker(1024) // Generate lots of small blocks
-            .degree(4)
-            .build()?
-            .store(&client_store)
-            .await?;
-
-        // The server may already have a subset of the data
-        FileBuilder::new()
-            .content_bytes(file_bytes[0..10_000].to_vec())
-            .fixed_chunker(1024) // Generate lots of small blocks
-            .degree(4)
-            .build()?
-            .store(&server_store)
-            .await?;
-
-        // Give both peers ~1MB of cache space for speeding up computations.
-        // These are available under the `quick_cache` feature.
-        // (You can also write your own, or disable caches using `NoCache`)
         let client_cache = InMemoryCache::new(100_000);
         let server_cache = InMemoryCache::new(100_000);
 
-        // We set up some protocol configurations around allowed maximum block sizes etc.
+        let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+        let root = store_test_unixfs(file_bytes.clone(), &client_store).await?;
+        store_test_unixfs(file_bytes[0..10_000].to_vec(), &server_store).await?;
+
         let config = &Config::default();
 
         let mut last_response = None;
         loop {
-            // The client generates a request that streams the data to the server
             let stream =
                 push::request_streaming(root, last_response, &client_store, &client_cache).await?;
 
@@ -208,8 +185,9 @@ mod tests {
             let response =
                 push::response_streaming(root, byte_stream, config, &server_store, &server_cache)
                     .await?;
+
             if response.indicates_finished() {
-                break; // we're done!
+                break;
             }
 
             last_response = Some(response);
