@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
         .run_car_mirror_pull(root, config, &store, &NoCache) // rounds of pull protocol
         .await?;
 
-    assert!(!store.has_block(&root).await?);
+    assert!(store.has_block(&root).await?);
 
     Ok(())
 }
