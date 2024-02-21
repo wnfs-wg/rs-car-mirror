@@ -21,7 +21,7 @@ use wnfs_common::{utils::CondSend, BlockStore};
 ///
 /// Before actually sending the request over the network,
 /// make sure to check the `request.indicates_finished()`.
-/// If true, the client already has all data and the request
+/// If true, the "client" already has all data and the request
 /// doesn't need to be sent.
 pub async fn request(
     root: Cid,
@@ -35,7 +35,10 @@ pub async fn request(
         .into())
 }
 
-/// TODO(matheus23): DOCS
+/// On the "client" side, handle a streaming response from a pull request.
+///
+/// This will accept blocks as long as they're useful to get the DAG under
+/// `root`, verify them, and store them in the given `store`.
 pub async fn handle_response_streaming(
     root: Cid,
     stream: impl AsyncRead + Unpin + CondSend,
@@ -48,7 +51,7 @@ pub async fn handle_response_streaming(
         .into())
 }
 
-/// Respond to a CAR mirror pull request.
+/// Respond to a CAR mirror pull request on the "server" side.
 pub async fn response(
     root: Cid,
     request: PullRequest,
@@ -60,7 +63,9 @@ pub async fn response(
     block_send(root, receiver_state, config, store, cache).await
 }
 
-/// TODO(matheus23): DOCS
+/// On the "server" side, respond to a pull request with a stream.
+///
+/// This can especially speed up cold pull requests.
 pub async fn response_streaming<'a>(
     root: Cid,
     request: PullRequest,

@@ -31,7 +31,11 @@ pub async fn request(
     block_send(root, receiver_state, config, store, cache).await
 }
 
-/// TODO(matheus23): DOCS
+/// Streaming version of `request` to create a push request.
+///
+/// It's recommended to run the streaming push until the "server" interrupts
+/// it with an updated `PushResponse`. Then continuing with another
+/// push request with updated information.
 pub async fn request_streaming<'a>(
     root: Cid,
     last_response: Option<PushResponse>,
@@ -50,7 +54,7 @@ pub async fn request_streaming<'a>(
 /// in the given `store`, if the blocks can be shown to relate
 /// to the `root` CID.
 ///
-/// Returns a response that gives the client information about what
+/// Returns a response that gives the "client" information about what
 /// other data remains to be fetched.
 pub async fn response(
     root: Cid,
@@ -64,7 +68,12 @@ pub async fn response(
         .into())
 }
 
-/// TODO(matheus23): DOCS
+/// Respond to a push request on the "server" side in a streaming fashing
+/// (as opposed to the `response` function).
+///
+/// This will read from the `request` until the server realizes it got
+/// some bytes it already had. Then it'll create an updated bloom filter
+/// and send a `PushResponse`, interrupting the incoming stream.
 pub async fn response_streaming(
     root: Cid,
     request: impl tokio::io::AsyncRead + Unpin + CondSend,

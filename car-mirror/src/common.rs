@@ -251,7 +251,7 @@ pub async fn block_receive_block_stream(
 
     while let Some((cid, block)) = stream.try_next().await? {
         let block_bytes = block.len();
-        // TODO: Find a way to restrict size *before* framing. Possibly inside `CarReader`?
+        // TODO(matheus23): Find a way to restrict size *before* framing. Possibly inside `CarReader`?
         // Possibly needs making `MAX_ALLOC` in `iroh-car` configurable.
         if block_bytes > config.max_block_size {
             return Err(Error::BlockSizeExceeded {
