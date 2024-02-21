@@ -5,7 +5,6 @@ use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
 use std::io::Cursor;
-use tracing::{debug, instrument, trace, warn};
 use wnfs_common::{
     utils::{boxed_stream, BoxStream, CondSend},
     BlockStore,
@@ -26,13 +25,53 @@ use crate::{
 /// Configuration values (such as byte limits) for the CAR mirror protocol
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// The maximum number of bytes per request that a recipient should.
+    /// The maximum number of bytes per request that a recipient should accept.
+    ///
+    /// This only has an effect in non-streaming versions of this protocol.
+    /// In streaming versions, car-mirror will check the validity of each block
+    /// while streaming.
+    ///
+    /// By default this is 2MB.
     pub receive_maximum: usize,
+    /// The maximum number of bytes per block.
+    ///
+    /// As long as we can't verify the hash value of a block, we can't verify if we've
+    /// been given the data we actuall want or not, thus we need to put a maximum value
+    /// on the byte size that we accept per block.
+    ///
+    /// By default this is 1MB.
+    ///
+    /// 1MB is also the default maximum block size in IPFS's bitswap protocol.
+    /// 256KiB is the default maximum block size that Kubo produces by default when generating
+    /// UnixFS blocks.
+    ///
+    /// `iroh-car` internally has a maximum 4MB limit on a CAR file frame (CID + block), so
+    /// any value above 4MB doesn't work.
+    pub max_block_size: usize,
     /// The maximum number of roots per request that will be requested by the recipient
     /// to be sent by the sender.
+    ///
+    /// By default this is 1_000.
     pub max_roots_per_round: usize,
     /// The target false positive rate for the bloom filter that the recipient sends.
+    ///
+    /// By default it's set to `|num| min(0.001, 0.1 / num)`.
+    ///
+    /// This default means bloom filters will aim to have a false positive probability
+    /// one order of magnitude under the number of elements. E.g. for 100_000 elements,
+    /// a false positive probability of 1 in 1 million.
     pub bloom_fpr: fn(u64) -> f64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            receive_maximum: 2_000_000, // 2 MB
+            max_block_size: 1_000_000,  // 1 MB
+            max_roots_per_round: 1000,  // max. ~41KB of CIDs
+            bloom_fpr: |num_of_elems| f64::min(0.001, 0.1 / num_of_elems as f64),
+        }
+    }
 }
 
 /// Some information that the block receiving end provides the block sending end
@@ -56,6 +95,10 @@ pub struct CarFile {
 /// A stream of blocks. This requires the underlying futures to be `Send`, except when the target is `wasm32`.
 pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 
+/// A stream of byte chunks of a CAR file.
+/// The underlying futures are `Send`, except when the target is `wasm32`.
+pub type CarStream<'a> = BoxStream<'a, Result<Bytes, Error>>;
+
 //--------------------------------------------------------------------------------------------------
 // Functions
 //--------------------------------------------------------------------------------------------------
@@ -67,7 +110,7 @@ pub type BlockStream<'a> = BoxStream<'a, Result<(Cid, Bytes), Error>>;
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip_all, fields(root, last_state))]
+#[tracing::instrument(skip_all, fields(root, last_state))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -93,17 +136,17 @@ pub async fn block_send(
 /// This is the streaming equivalent of `block_send`.
 ///
 /// It uses the car file format for framing blocks & CIDs in the given `AsyncWrite`.
-#[instrument(skip_all, fields(root, last_state))]
+#[tracing::instrument(skip_all, fields(root, last_state))]
 pub async fn block_send_car_stream<W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
-    stream: W,
+    writer: W,
     send_limit: Option<usize>,
     store: impl BlockStore,
     cache: impl Cache,
 ) -> Result<W, Error> {
     let mut block_stream = block_send_block_stream(root, last_state, store, cache).await?;
-    write_blocks_into_car(stream, &mut block_stream, send_limit).await
+    write_blocks_into_car(writer, &mut block_stream, send_limit).await
 }
 
 /// This is the car mirror block sending function, but unlike `block_send_car_stream`
@@ -141,7 +184,7 @@ pub async fn block_send_block_stream<'a>(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[tracing::instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
@@ -173,7 +216,7 @@ pub async fn block_receive(
 }
 
 /// Like `block_receive`, but allows consuming the CAR file as a stream.
-#[instrument(skip_all, fields(root))]
+#[tracing::instrument(skip_all, fields(root))]
 pub async fn block_receive_car_stream<R: tokio::io::AsyncRead + Unpin + CondSend>(
     root: Cid,
     reader: R,
@@ -202,9 +245,21 @@ pub async fn block_receive_block_stream(
     store: impl BlockStore,
     cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
+    let max_block_size = config.max_block_size;
     let mut dag_verification = IncrementalDagVerification::new([root], &store, &cache).await?;
 
     while let Some((cid, block)) = stream.try_next().await? {
+        let block_bytes = block.len();
+        // TODO(matheus23): Find a way to restrict size *before* framing. Possibly inside `CarReader`?
+        // Possibly needs making `MAX_ALLOC` in `iroh-car` configurable.
+        if block_bytes > config.max_block_size {
+            return Err(Error::BlockSizeExceeded {
+                cid,
+                block_bytes,
+                max_block_size,
+            });
+        }
+
         match read_and_verify_block(&mut dag_verification, (cid, block), &store, &cache).await? {
             BlockState::Have => {
                 // This can happen because we've just discovered a subgraph we already have.
@@ -239,9 +294,7 @@ pub async fn block_receive_block_stream(
 /// The frame boundaries are after the header section and between each block.
 ///
 /// The first frame will always be a CAR file header frame.
-pub async fn stream_car_frames(
-    mut blocks: BlockStream<'_>,
-) -> Result<BoxStream<'_, Result<Bytes, Error>>, Error> {
+pub async fn stream_car_frames(mut blocks: BlockStream<'_>) -> Result<CarStream<'_>, Error> {
     // https://github.com/wnfs-wg/car-mirror-spec/issues/6
     // CAR files *must* have at least one CID in them, and all of them
     // need to appear as a block in the payload.
@@ -250,7 +303,7 @@ pub async fn stream_car_frames(
     // so we're simply writing the first one in here, since we know
     // at least one block will be written (and it'll be that one).
     let Some((cid, block)) = blocks.try_next().await? else {
-        debug!("No blocks to write.");
+        tracing::debug!("No blocks to write.");
         return Ok(boxed_stream(futures::stream::empty()));
     };
 
@@ -333,7 +386,7 @@ async fn verify_missing_subgraph_roots(
             .collect::<Vec<_>>()
             .join(", ");
 
-        warn!(
+        tracing::warn!(
             unrelated_roots = %unrelated_roots,
             "got asked for DAG-unrelated blocks"
         );
@@ -344,7 +397,7 @@ async fn verify_missing_subgraph_roots(
 
 fn handle_missing_bloom(have_cids_bloom: Option<BloomFilter>) -> BloomFilter {
     if let Some(bloom) = &have_cids_bloom {
-        debug!(
+        tracing::debug!(
             size_bits = bloom.as_bytes().len() * 8,
             hash_count = bloom.hash_count(),
             ones_count = bloom.count_ones(),
@@ -394,7 +447,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     // so we're simply writing the first one in here, since we know
     // at least one block will be written (and it'll be that one).
     let Some((cid, block)) = blocks.try_next().await? else {
-        debug!("No blocks to write.");
+        tracing::debug!("No blocks to write.");
         return Ok(write);
     };
 
@@ -403,7 +456,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     block_bytes += writer.write(cid, block).await?;
 
     while let Some((cid, block)) = blocks.try_next().await? {
-        debug!(
+        tracing::debug!(
             cid = %cid,
             num_bytes = block.len(),
             "writing block to CAR",
@@ -415,7 +468,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
 
         if let Some(receive_limit) = size_limit {
             if block_bytes + added_bytes > receive_limit {
-                debug!(%cid, receive_limit, block_bytes, added_bytes, "Skipping block because it would go over the receive limit");
+                tracing::debug!(%cid, receive_limit, block_bytes, added_bytes, "Skipping block because it would go over the receive limit");
                 break;
             }
         }
@@ -441,7 +494,7 @@ async fn read_and_verify_block(
     match dag_verification.block_state(cid) {
         BlockState::Have => Ok(BlockState::Have),
         BlockState::Unexpected => {
-            trace!(
+            tracing::trace!(
                 cid = %cid,
                 "received block out of order (possibly due to bloom false positive)"
             );
@@ -543,16 +596,6 @@ impl ReceiverState {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            receive_maximum: 2_000_000, // 2 MB
-            max_roots_per_round: 1000,  // max. ~41KB of CIDs
-            bloom_fpr: |num_of_elems| f64::min(0.001, 0.1 / num_of_elems as f64),
-        }
-    }
-}
-
 impl std::fmt::Debug for ReceiverState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let have_cids_bloom = self
@@ -576,11 +619,12 @@ impl std::fmt::Debug for ReceiverState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
+    use assert_matches::assert_matches;
     use testresult::TestResult;
-    use wnfs_common::MemoryBlockStore;
+    use wnfs_common::{MemoryBlockStore, CODEC_RAW};
 
     #[allow(clippy::unreachable, unused)]
     fn test_assert_send() {
@@ -614,6 +658,63 @@ mod tests {
         let debug_print = format!("{state:#?}");
 
         assert!(debug_print.len() < 1000);
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_stream_car_frame_empty() -> TestResult {
+        let car_frames = stream_car_frames(futures::stream::empty().boxed()).await?;
+        let frames: Vec<Bytes> = car_frames.try_collect().await?;
+
+        assert!(frames.is_empty());
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_write_blocks_into_car_empty() -> TestResult {
+        let car_file =
+            write_blocks_into_car(Vec::new(), &mut futures::stream::empty().boxed(), None).await?;
+
+        assert!(car_file.is_empty());
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_block_receive_block_stream_block_size_exceeded() -> TestResult {
+        let store = &MemoryBlockStore::new();
+
+        let block_small: Bytes = b"This one is small".to_vec().into();
+        let block_big: Bytes = b"This one is very very very big".to_vec().into();
+        let root_small = store.put_block(block_small.clone(), CODEC_RAW).await?;
+        let root_big = store.put_block(block_big.clone(), CODEC_RAW).await?;
+
+        let config = &Config {
+            max_block_size: 20,
+            ..Config::default()
+        };
+
+        block_receive_block_stream(
+            root_small,
+            &mut futures::stream::iter(vec![Ok((root_small, block_small))]).boxed(),
+            config,
+            MemoryBlockStore::new(),
+            NoCache,
+        )
+        .await?;
+
+        let result = block_receive_block_stream(
+            root_small,
+            &mut futures::stream::iter(vec![Ok((root_big, block_big))]).boxed(),
+            config,
+            MemoryBlockStore::new(),
+            NoCache,
+        )
+        .await;
+
+        assert_matches!(result, Err(Error::BlockSizeExceeded { .. }));
 
         Ok(())
     }

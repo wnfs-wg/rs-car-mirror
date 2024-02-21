@@ -1,11 +1,14 @@
 use crate::{
     cache::Cache,
-    common::{block_receive, block_send, CarFile, Config, ReceiverState},
+    common::{
+        block_receive, block_receive_car_stream, block_send, block_send_block_stream,
+        stream_car_frames, CarFile, CarStream, Config, ReceiverState,
+    },
     error::Error,
     messages::PushResponse,
 };
 use libipld_core::cid::Cid;
-use wnfs_common::BlockStore;
+use wnfs_common::{utils::CondSend, BlockStore};
 
 /// Create a CAR mirror push request.
 ///
@@ -28,13 +31,30 @@ pub async fn request(
     block_send(root, receiver_state, config, store, cache).await
 }
 
+/// Streaming version of `request` to create a push request.
+///
+/// It's recommended to run the streaming push until the "server" interrupts
+/// it with an updated `PushResponse`. Then continuing with another
+/// push request with updated information.
+pub async fn request_streaming<'a>(
+    root: Cid,
+    last_response: Option<PushResponse>,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
+) -> Result<CarStream<'a>, Error> {
+    let receiver_state = last_response.map(|s| s.into());
+    let block_stream = block_send_block_stream(root, receiver_state, store, cache).await?;
+    let car_stream = stream_car_frames(block_stream).await?;
+    Ok(car_stream)
+}
+
 /// Create a response for a CAR mirror push request.
 ///
 /// This takes in the CAR file from the request body and stores its blocks
 /// in the given `store`, if the blocks can be shown to relate
 /// to the `root` CID.
 ///
-/// Returns a response that gives the client information about what
+/// Returns a response that gives the "client" information about what
 /// other data remains to be fetched.
 pub async fn response(
     root: Cid,
@@ -48,15 +68,36 @@ pub async fn response(
         .into())
 }
 
+/// Respond to a push request on the "server" side in a streaming fashing
+/// (as opposed to the `response` function).
+///
+/// This will read from the `request` until the server realizes it got
+/// some bytes it already had. Then it'll create an updated bloom filter
+/// and send a `PushResponse`, interrupting the incoming stream.
+pub async fn response_streaming(
+    root: Cid,
+    request: impl tokio::io::AsyncRead + Unpin + CondSend,
+    config: &Config,
+    store: impl BlockStore,
+    cache: impl Cache,
+) -> Result<PushResponse, Error> {
+    Ok(
+        block_receive_car_stream(root, request, config, store, cache)
+            .await?
+            .into(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        cache::NoCache,
+        cache::{InMemoryCache, NoCache},
         common::Config,
         dag_walk::DagWalk,
+        push,
         test_utils::{
-            get_cid_at_approx_path, setup_random_dag, total_dag_blocks, total_dag_bytes, Metrics,
-            Rvg,
+            get_cid_at_approx_path, setup_random_dag, store_test_unixfs, total_dag_blocks,
+            total_dag_bytes, Metrics, Rvg,
         },
     };
     use anyhow::Result;
@@ -65,6 +106,7 @@ mod tests {
     use proptest::collection::vec;
     use std::collections::HashSet;
     use testresult::TestResult;
+    use tokio_util::io::StreamReader;
     use wnfs_common::{BlockStore, MemoryBlockStore};
 
     pub(crate) async fn simulate_protocol(
@@ -74,11 +116,10 @@ mod tests {
         server_store: &impl BlockStore,
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
-        let mut request = crate::push::request(root, None, config, client_store, &NoCache).await?;
+        let mut request = push::request(root, None, config, client_store, &NoCache).await?;
         loop {
             let request_bytes = request.bytes.len();
-            let response =
-                crate::push::response(root, request, config, server_store, &NoCache).await?;
+            let response = push::response(root, request, config, server_store, &NoCache).await?;
             let response_bytes = serde_ipld_dagcbor::to_vec(&response)?.len();
 
             metrics.push(Metrics {
@@ -89,8 +130,7 @@ mod tests {
             if response.indicates_finished() {
                 break;
             }
-            request =
-                crate::push::request(root, Some(response), config, client_store, &NoCache).await?;
+            request = push::request(root, Some(response), config, client_store, &NoCache).await?;
         }
 
         Ok(metrics)
@@ -116,6 +156,42 @@ mod tests {
 
         assert_eq!(client_cids, server_cids);
 
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_streaming_transfer() -> TestResult {
+        let client_store = MemoryBlockStore::new();
+        let server_store = MemoryBlockStore::new();
+
+        let client_cache = InMemoryCache::new(100_000);
+        let server_cache = InMemoryCache::new(100_000);
+
+        let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+        let root = store_test_unixfs(file_bytes.clone(), &client_store).await?;
+        store_test_unixfs(file_bytes[0..10_000].to_vec(), &server_store).await?;
+
+        let config = &Config::default();
+
+        let mut last_response = None;
+        loop {
+            let stream =
+                push::request_streaming(root, last_response, &client_store, &client_cache).await?;
+
+            let byte_stream = StreamReader::new(
+                stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            );
+
+            let response =
+                push::response_streaming(root, byte_stream, config, &server_store, &server_cache)
+                    .await?;
+
+            if response.indicates_finished() {
+                break;
+            }
+
+            last_response = Some(response);
+        }
         Ok(())
     }
 
@@ -191,6 +267,7 @@ mod proptests {
         cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
+        push,
         test_utils::{setup_blockstore, variable_blocksize_dag},
     };
     use futures::TryStreamExt;
@@ -206,14 +283,9 @@ mod proptests {
             let client_store = &setup_blockstore(blocks).await.unwrap();
             let server_store = &MemoryBlockStore::new();
 
-            crate::push::tests::simulate_protocol(
-                root,
-                &Config::default(),
-                client_store,
-                server_store,
-            )
-            .await
-            .unwrap();
+            push::tests::simulate_protocol(root, &Config::default(), client_store, server_store)
+                .await
+                .unwrap();
 
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])

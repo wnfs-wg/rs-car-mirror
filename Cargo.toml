@@ -2,8 +2,9 @@
 members = [
 	"car-mirror",
 	"car-mirror-benches",
+	"car-mirror-reqwest",
 	"car-mirror-wasm",
-	"examples"
+	"examples",
 ]
 
 [workspace.dependencies]

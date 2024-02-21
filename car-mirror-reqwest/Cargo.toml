@@ -1,0 +1,53 @@
+[package]
+name = "car-mirror-reqwest"
+version = "0.1.0"
+description = "Adapter for using car-mirror with reqwest-middleware"
+keywords = []
+categories = []
+include = ["/src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+license = "Apache-2.0"
+readme = "README.md"
+edition = "2021"
+rust-version = "1.66"
+documentation = "https://docs.rs/car-mirror-reqwest"
+repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-reqwest"
+authors = ["Philipp Krüger <philipp@fission.codes>"]
+
+[lib]
+path = "src/lib.rs"
+doctest = true
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1.4"
+car-mirror = { version = "0.1", path = "../car-mirror" }
+futures = "0.3"
+libipld = "0.16"
+reqwest = { version = "0.11", default-features = false, features = ["json", "stream"] }
+reqwest-middleware = "0.2"
+thiserror = "1.0"
+tokio-util = { version = "0.7", features = ["io"] }
+tracing = "0.1"
+wnfs-common = { workspace = true }
+
+[dev-dependencies]
+axum = "0.7"
+axum-macros = "0.4"
+car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
+test-strategy = "0.3"
+testresult = "0.3"
+tokio = { version = "1.0", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
+
+[features]
+
+[package.metadata.docs.rs]
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[test]]
+name = "integration"
+path = "integration/axum.rs"

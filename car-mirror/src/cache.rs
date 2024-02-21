@@ -91,7 +91,7 @@ impl<C: Cache> Cache for Box<C> {
 }
 
 /// An implementation of `Cache` that doesn't cache at all.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NoCache;
 
 impl Cache for NoCache {

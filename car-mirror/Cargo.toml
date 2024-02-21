@@ -37,14 +37,17 @@ tracing = "0.1"
 wnfs-common = { workspace = true }
 
 [dev-dependencies]
+assert_matches = "1.5.0"
 async-std = { version = "1.11", features = ["attributes"] }
-car-mirror = { path = ".", features = ["test_utils"] }
+car-mirror = { path = ".", features = ["quick_cache", "test_utils"] }
 proptest = "1.1"
 roaring-graphs = "0.12"
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 test-strategy = "0.3"
 testresult = "0.3"
+tokio-util = { version = "0.7.8", features = ["io"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
+wnfs-unixfs-file = { version = "0.2.0" }
 
 [features]
 default = []

@@ -94,3 +94,13 @@ pub(crate) async fn total_dag_blocks(root: Cid, store: &impl BlockStore) -> Resu
 }
 
 pub(crate) fn assert_cond_send_sync<T: CondSend>(_fut: fn() -> T) {}
+
+pub(crate) async fn store_test_unixfs(data: Vec<u8>, store: &impl BlockStore) -> Result<Cid> {
+    wnfs_unixfs_file::builder::FileBuilder::new()
+        .content_bytes(data)
+        .fixed_chunker(1024) // Generate lots of small blocks
+        .degree(4)
+        .build()?
+        .store(store)
+        .await
+}

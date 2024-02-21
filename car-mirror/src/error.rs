@@ -1,7 +1,6 @@
+use crate::incremental_verification::BlockState;
 use libipld::Cid;
 use wnfs_common::BlockStoreError;
-
-use crate::incremental_verification::BlockState;
 
 /// Errors raised from the CAR mirror library
 #[derive(thiserror::Error, Debug)]
@@ -16,7 +15,18 @@ pub enum Error {
         bytes_read: usize,
     },
 
-    /// This library only supports a subset of default codecs, including DAG-CBOR, DAG-JSON, DAG-PB and more.g
+    /// An error raised when an individual block exceeded the maximum configured block size
+    #[error("Maximum block size exceeded, maximum configured block size is {max_block_size} bytes, but got {block_bytes} at {cid}")]
+    BlockSizeExceeded {
+        /// The CID of the block that exceeded the maximum
+        cid: Cid,
+        /// The amount of bytes we got for this block up to this point
+        block_bytes: usize,
+        /// The maximum block size from our configuration
+        max_block_size: usize,
+    },
+
+    /// This library only supports a subset of default codecs, including DAG-CBOR, DAG-JSON, DAG-PB and more.
     /// This is raised if an unknown codec is read from a CID. See the `libipld` library for more information.
     #[error("Unsupported codec in Cid: {cid}")]
     UnsupportedCodec {
