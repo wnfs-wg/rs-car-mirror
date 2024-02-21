@@ -91,9 +91,10 @@ pub async fn response_streaming(
 #[cfg(test)]
 mod tests {
     use crate::{
-        cache::NoCache,
+        cache::{InMemoryCache, NoCache},
         common::Config,
         dag_walk::DagWalk,
+        push,
         test_utils::{
             get_cid_at_approx_path, setup_random_dag, total_dag_blocks, total_dag_bytes, Metrics,
             Rvg,
@@ -105,7 +106,9 @@ mod tests {
     use proptest::collection::vec;
     use std::collections::HashSet;
     use testresult::TestResult;
+    use tokio_util::io::StreamReader;
     use wnfs_common::{BlockStore, MemoryBlockStore};
+    use wnfs_unixfs_file::builder::FileBuilder;
 
     pub(crate) async fn simulate_protocol(
         root: Cid,
@@ -114,11 +117,10 @@ mod tests {
         server_store: &impl BlockStore,
     ) -> Result<Vec<Metrics>> {
         let mut metrics = Vec::new();
-        let mut request = crate::push::request(root, None, config, client_store, &NoCache).await?;
+        let mut request = push::request(root, None, config, client_store, &NoCache).await?;
         loop {
             let request_bytes = request.bytes.len();
-            let response =
-                crate::push::response(root, request, config, server_store, &NoCache).await?;
+            let response = push::response(root, request, config, server_store, &NoCache).await?;
             let response_bytes = serde_ipld_dagcbor::to_vec(&response)?.len();
 
             metrics.push(Metrics {
@@ -129,8 +131,7 @@ mod tests {
             if response.indicates_finished() {
                 break;
             }
-            request =
-                crate::push::request(root, Some(response), config, client_store, &NoCache).await?;
+            request = push::request(root, Some(response), config, client_store, &NoCache).await?;
         }
 
         Ok(metrics)
@@ -156,6 +157,63 @@ mod tests {
 
         assert_eq!(client_cids, server_cids);
 
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_streaming_transfer() -> TestResult {
+        // We simulate peers having separate data stores
+        let client_store = MemoryBlockStore::new();
+        let server_store = MemoryBlockStore::new();
+
+        let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+
+        // Load some data onto the client
+        let root = FileBuilder::new()
+            .content_bytes(file_bytes.clone())
+            .fixed_chunker(1024) // Generate lots of small blocks
+            .degree(4)
+            .build()?
+            .store(&client_store)
+            .await?;
+
+        // The server may already have a subset of the data
+        FileBuilder::new()
+            .content_bytes(file_bytes[0..10_000].to_vec())
+            .fixed_chunker(1024) // Generate lots of small blocks
+            .degree(4)
+            .build()?
+            .store(&server_store)
+            .await?;
+
+        // Give both peers ~1MB of cache space for speeding up computations.
+        // These are available under the `quick_cache` feature.
+        // (You can also write your own, or disable caches using `NoCache`)
+        let client_cache = InMemoryCache::new(100_000);
+        let server_cache = InMemoryCache::new(100_000);
+
+        // We set up some protocol configurations around allowed maximum block sizes etc.
+        let config = &Config::default();
+
+        let mut last_response = None;
+        loop {
+            // The client generates a request that streams the data to the server
+            let stream =
+                push::request_streaming(root, last_response, &client_store, &client_cache).await?;
+
+            let byte_stream = StreamReader::new(
+                stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            );
+
+            let response =
+                push::response_streaming(root, byte_stream, config, &server_store, &server_cache)
+                    .await?;
+            if response.indicates_finished() {
+                break; // we're done!
+            }
+
+            last_response = Some(response);
+        }
         Ok(())
     }
 
@@ -231,6 +289,7 @@ mod proptests {
         cache::NoCache,
         common::Config,
         dag_walk::DagWalk,
+        push,
         test_utils::{setup_blockstore, variable_blocksize_dag},
     };
     use futures::TryStreamExt;
@@ -246,14 +305,9 @@ mod proptests {
             let client_store = &setup_blockstore(blocks).await.unwrap();
             let server_store = &MemoryBlockStore::new();
 
-            crate::push::tests::simulate_protocol(
-                root,
-                &Config::default(),
-                client_store,
-                server_store,
-            )
-            .await
-            .unwrap();
+            push::tests::simulate_protocol(root, &Config::default(), client_store, server_store)
+                .await
+                .unwrap();
 
             // client should have all data
             let client_cids = DagWalk::breadth_first([root])
