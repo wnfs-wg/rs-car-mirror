@@ -32,7 +32,7 @@ pub trait RequestBuilderExt {
     /// lifetimes work with `reqwest`.
     /// Usually blockstores and caches satisfy these conditions due to
     /// using atomic reference counters.
-    fn send_car_mirror_push(
+    fn run_car_mirror_push(
         &self,
         root: Cid,
         store: &(impl BlockStore + Clone + 'static),
@@ -55,7 +55,7 @@ pub trait RequestBuilderExt {
     /// This will call `try_clone()` and `send()` on this
     /// request builder, so it must not have a `body` set yet.
     /// There is no need to set a body, this function will do so automatically.
-    fn send_car_mirror_pull(
+    fn run_car_mirror_pull(
         &self,
         root: Cid,
         config: &Config,
@@ -65,7 +65,7 @@ pub trait RequestBuilderExt {
 }
 
 impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
-    async fn send_car_mirror_push(
+    async fn run_car_mirror_push(
         &self,
         root: Cid,
         store: &(impl BlockStore + Clone + 'static),
@@ -83,7 +83,7 @@ impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
         .await
     }
 
-    async fn send_car_mirror_pull(
+    async fn run_car_mirror_pull(
         &self,
         root: Cid,
         config: &Config,
@@ -104,7 +104,7 @@ impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
 }
 
 impl RequestBuilderExt for reqwest::RequestBuilder {
-    async fn send_car_mirror_push(
+    async fn run_car_mirror_push(
         &self,
         root: Cid,
         store: &(impl BlockStore + Clone + 'static),
@@ -122,7 +122,7 @@ impl RequestBuilderExt for reqwest::RequestBuilder {
         .await
     }
 
-    async fn send_car_mirror_pull(
+    async fn run_car_mirror_pull(
         &self,
         root: Cid,
         config: &Config,
@@ -144,9 +144,9 @@ impl RequestBuilderExt for reqwest::RequestBuilder {
 
 /// Run (possibly multiple rounds of) the car mirror push protocol.
 ///
-/// See `send_car_mirror_push` for a more ergonomic interface.
+/// See `run_car_mirror_push` for a more ergonomic interface.
 ///
-/// Unlike `send_car_mirror_push`, this allows customizing the
+/// Unlike `run_car_mirror_push`, this allows customizing the
 /// request every time it gets built, e.g. to refresh authentication tokens.
 pub async fn push_with<F, Fut, E>(
     root: Cid,
@@ -190,9 +190,9 @@ where
 
 /// Run (possibly multiple rounds of) the car mirror pull protocol.
 ///
-/// See `send_car_mirror_pull` for a more ergonomic interface.
+/// See `run_car_mirror_pull` for a more ergonomic interface.
 ///
-/// Unlike `send_car_mirror_pull`, this allows customizing the
+/// Unlike `run_car_mirror_pull`, this allows customizing the
 /// request every time it gets built, e.g. to refresh authentication tokens.
 pub async fn pull_with<F, Fut, E>(
     root: Cid,

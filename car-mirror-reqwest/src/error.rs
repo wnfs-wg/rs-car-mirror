@@ -14,7 +14,7 @@ pub enum Error {
     /// `RequestBuilder::body(Body::wrap_stream(...))` was called.
     ///
     /// Generally, car-mirror-reqwest will take over body creation, so there's
-    /// no point in setting the body before `send_car_mirror_pull` / `send_car_mirror_push`.
+    /// no point in setting the body before `run_car_mirror_pull` / `run_car_mirror_push`.
     #[error("Body must not be set on request builder")]
     RequestBuilderBodyAlreadySet,
 
