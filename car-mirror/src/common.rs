@@ -26,13 +26,53 @@ use crate::{
 /// Configuration values (such as byte limits) for the CAR mirror protocol
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// The maximum number of bytes per request that a recipient should.
+    /// The maximum number of bytes per request that a recipient should accept.
+    ///
+    /// This only has an effect in non-streaming versions of this protocol.
+    /// In streaming versions, car-mirror will check the validity of each block
+    /// while streaming.
+    ///
+    /// By default this is 2MB.
     pub receive_maximum: usize,
+    /// The maximum number of bytes per block.
+    ///
+    /// As long as we can't verify the hash value of a block, we can't verify if we've
+    /// been given the data we actuall want or not, thus we need to put a maximum value
+    /// on the byte size that we accept per block.
+    ///
+    /// By default this is 1MB.
+    ///
+    /// 1MB is also the default maximum block size in IPFS's bitswap protocol.
+    /// 256KiB is the default maximum block size that Kubo produces by default when generating
+    /// UnixFS blocks.
+    ///
+    /// `iroh-car` internally has a maximum 4MB limit on a CAR file frame (CID + block), so
+    /// any value above 4MB doesn't work.
+    pub max_block_size: usize,
     /// The maximum number of roots per request that will be requested by the recipient
     /// to be sent by the sender.
+    ///
+    /// By default this is 1_000.
     pub max_roots_per_round: usize,
     /// The target false positive rate for the bloom filter that the recipient sends.
+    ///
+    /// By default it's set to `|num| min(0.001, 0.1 / num)`.
+    ///
+    /// This default means bloom filters will aim to have a false positive probability
+    /// one order of magnitude under the number of elements. E.g. for 100_000 elements,
+    /// a false positive probability of 1 in 1 million.
     pub bloom_fpr: fn(u64) -> f64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            receive_maximum: 2_000_000, // 2 MB
+            max_block_size: 1_000_000,  // 1 MB
+            max_roots_per_round: 1000,  // max. ~41KB of CIDs
+            bloom_fpr: |num_of_elems| f64::min(0.001, 0.1 / num_of_elems as f64),
+        }
+    }
 }
 
 /// Some information that the block receiving end provides the block sending end
@@ -206,9 +246,21 @@ pub async fn block_receive_block_stream(
     store: impl BlockStore,
     cache: impl Cache,
 ) -> Result<ReceiverState, Error> {
+    let max_block_size = config.max_block_size;
     let mut dag_verification = IncrementalDagVerification::new([root], &store, &cache).await?;
 
     while let Some((cid, block)) = stream.try_next().await? {
+        let block_bytes = block.len();
+        // TODO: Find a way to restrict size *before* framing. Possibly inside `CarReader`?
+        // Possibly needs making `MAX_ALLOC` in `iroh-car` configurable.
+        if block_bytes > config.max_block_size {
+            return Err(Error::BlockSizeExceeded {
+                cid,
+                block_bytes,
+                max_block_size,
+            });
+        }
+
         match read_and_verify_block(&mut dag_verification, (cid, block), &store, &cache).await? {
             BlockState::Have => {
                 // This can happen because we've just discovered a subgraph we already have.
@@ -541,16 +593,6 @@ impl ReceiverState {
                 bloom.hash_count as usize,
                 bloom.bytes.into_boxed_slice(),
             ))
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            receive_maximum: 2_000_000, // 2 MB
-            max_roots_per_round: 1000,  // max. ~41KB of CIDs
-            bloom_fpr: |num_of_elems| f64::min(0.001, 0.1 / num_of_elems as f64),
         }
     }
 }
