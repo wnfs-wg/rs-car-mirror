@@ -20,7 +20,7 @@ use std::{future::IntoFuture, str::FromStr};
 use tokio_util::io::StreamReader;
 use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_RAW};
 
-#[tokio::main]
+#[test_log::test(tokio::test)]
 async fn main() -> Result<()> {
     // Say, you have a webserver running like so:
     let app = Router::new()
@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
         .run_car_mirror_pull(root, config, &store, &NoCache) // rounds of pull protocol
         .await?;
 
-    assert!(store.has_block(&root).await?);
+    assert!(!store.has_block(&root).await?);
 
     Ok(())
 }

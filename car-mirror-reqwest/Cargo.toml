@@ -47,3 +47,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parki
 all-features = true
 # defines the configuration attribute `docsrs`
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[test]]
+name = "integration"
+path = "integration/axum.rs"

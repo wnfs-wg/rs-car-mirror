@@ -37,7 +37,7 @@
 //! # }
 //! ```
 //!
-//! For the full example, please see `examples/axum.rs` in the source repository.
+//! For the full example, please see `integration/axum.rs` in the source repository.
 
 mod error;
 mod request;
