@@ -1,14 +1,14 @@
 use crate::{
     cache::Cache,
     common::{
-        block_receive, block_send, block_send_block_stream, stream_car_frames, CarFile, CarStream,
-        Config, ReceiverState,
+        block_receive, block_receive_car_stream, block_send, block_send_block_stream,
+        stream_car_frames, CarFile, CarStream, Config, ReceiverState,
     },
     error::Error,
     messages::PushResponse,
 };
 use libipld_core::cid::Cid;
-use wnfs_common::BlockStore;
+use wnfs_common::{utils::CondSend, BlockStore};
 
 /// Create a CAR mirror push request.
 ///
@@ -62,6 +62,21 @@ pub async fn response(
     Ok(block_receive(root, Some(request), config, store, cache)
         .await?
         .into())
+}
+
+/// TODO(matheus23): DOCS
+pub async fn response_streaming(
+    root: Cid,
+    request: impl tokio::io::AsyncRead + Unpin + CondSend,
+    config: &Config,
+    store: impl BlockStore,
+    cache: impl Cache,
+) -> Result<PushResponse, Error> {
+    Ok(
+        block_receive_car_stream(root, request, config, store, cache)
+            .await?
+            .into(),
+    )
 }
 
 #[cfg(test)]

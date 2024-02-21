@@ -1,6 +1,9 @@
 use crate::{
     cache::Cache,
-    common::{block_receive, block_receive_car_stream, block_send, CarFile, Config, ReceiverState},
+    common::{
+        block_receive, block_receive_car_stream, block_send, block_send_block_stream,
+        stream_car_frames, CarFile, CarStream, Config, ReceiverState,
+    },
     error::Error,
     messages::PullRequest,
 };
@@ -55,6 +58,18 @@ pub async fn response(
 ) -> Result<CarFile, Error> {
     let receiver_state = Some(ReceiverState::from(request));
     block_send(root, receiver_state, config, store, cache).await
+}
+
+/// TODO(matheus23): DOCS
+pub async fn response_streaming<'a>(
+    root: Cid,
+    request: PullRequest,
+    store: impl BlockStore + 'a,
+    cache: impl Cache + 'a,
+) -> Result<CarStream<'a>, Error> {
+    let block_stream = block_send_block_stream(root, Some(request.into()), store, cache).await?;
+    let car_stream = stream_car_frames(block_stream).await?;
+    Ok(car_stream)
 }
 
 #[cfg(test)]
