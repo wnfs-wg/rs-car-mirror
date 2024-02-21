@@ -5,7 +5,6 @@ use iroh_car::{CarHeader, CarReader, CarWriter};
 use libipld::{Ipld, IpldCodec};
 use libipld_core::{cid::Cid, codec::References};
 use std::io::Cursor;
-use tracing::{debug, instrument, trace, warn};
 use wnfs_common::{
     utils::{boxed_stream, BoxStream, CondSend},
     BlockStore,
@@ -111,7 +110,7 @@ pub type CarStream<'a> = BoxStream<'a, Result<Bytes, Error>>;
 ///
 /// It returns a `CarFile` of (a subset) of all blocks below `root`, that
 /// are thought to be missing on the receiving end.
-#[instrument(skip_all, fields(root, last_state))]
+#[tracing::instrument(skip_all, fields(root, last_state))]
 pub async fn block_send(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -137,7 +136,7 @@ pub async fn block_send(
 /// This is the streaming equivalent of `block_send`.
 ///
 /// It uses the car file format for framing blocks & CIDs in the given `AsyncWrite`.
-#[instrument(skip_all, fields(root, last_state))]
+#[tracing::instrument(skip_all, fields(root, last_state))]
 pub async fn block_send_car_stream<W: tokio::io::AsyncWrite + Unpin + Send>(
     root: Cid,
     last_state: Option<ReceiverState>,
@@ -185,7 +184,7 @@ pub async fn block_send_block_stream<'a>(
 /// It takes a `CarFile`, verifies that its contents are related to the
 /// `root` and returns some information to help the block sending side
 /// figure out what blocks to send next.
-#[instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
+#[tracing::instrument(skip_all, fields(root, car_bytes = last_car.as_ref().map(|car| car.bytes.len())))]
 pub async fn block_receive(
     root: Cid,
     last_car: Option<CarFile>,
@@ -217,7 +216,7 @@ pub async fn block_receive(
 }
 
 /// Like `block_receive`, but allows consuming the CAR file as a stream.
-#[instrument(skip_all, fields(root))]
+#[tracing::instrument(skip_all, fields(root))]
 pub async fn block_receive_car_stream<R: tokio::io::AsyncRead + Unpin + CondSend>(
     root: Cid,
     reader: R,
@@ -304,7 +303,7 @@ pub async fn stream_car_frames(mut blocks: BlockStream<'_>) -> Result<CarStream<
     // so we're simply writing the first one in here, since we know
     // at least one block will be written (and it'll be that one).
     let Some((cid, block)) = blocks.try_next().await? else {
-        debug!("No blocks to write.");
+        tracing::debug!("No blocks to write.");
         return Ok(boxed_stream(futures::stream::empty()));
     };
 
@@ -387,7 +386,7 @@ async fn verify_missing_subgraph_roots(
             .collect::<Vec<_>>()
             .join(", ");
 
-        warn!(
+        tracing::warn!(
             unrelated_roots = %unrelated_roots,
             "got asked for DAG-unrelated blocks"
         );
@@ -398,7 +397,7 @@ async fn verify_missing_subgraph_roots(
 
 fn handle_missing_bloom(have_cids_bloom: Option<BloomFilter>) -> BloomFilter {
     if let Some(bloom) = &have_cids_bloom {
-        debug!(
+        tracing::debug!(
             size_bits = bloom.as_bytes().len() * 8,
             hash_count = bloom.hash_count(),
             ones_count = bloom.count_ones(),
@@ -448,7 +447,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     // so we're simply writing the first one in here, since we know
     // at least one block will be written (and it'll be that one).
     let Some((cid, block)) = blocks.try_next().await? else {
-        debug!("No blocks to write.");
+        tracing::debug!("No blocks to write.");
         return Ok(write);
     };
 
@@ -457,7 +456,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
     block_bytes += writer.write(cid, block).await?;
 
     while let Some((cid, block)) = blocks.try_next().await? {
-        debug!(
+        tracing::debug!(
             cid = %cid,
             num_bytes = block.len(),
             "writing block to CAR",
@@ -469,7 +468,7 @@ async fn write_blocks_into_car<W: tokio::io::AsyncWrite + Unpin + Send>(
 
         if let Some(receive_limit) = size_limit {
             if block_bytes + added_bytes > receive_limit {
-                debug!(%cid, receive_limit, block_bytes, added_bytes, "Skipping block because it would go over the receive limit");
+                tracing::debug!(%cid, receive_limit, block_bytes, added_bytes, "Skipping block because it would go over the receive limit");
                 break;
             }
         }
@@ -495,7 +494,7 @@ async fn read_and_verify_block(
     match dag_verification.block_state(cid) {
         BlockState::Have => Ok(BlockState::Have),
         BlockState::Unexpected => {
-            trace!(
+            tracing::trace!(
                 cid = %cid,
                 "received block out of order (possibly due to bloom false positive)"
             );

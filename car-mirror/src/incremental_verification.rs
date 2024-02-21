@@ -11,7 +11,6 @@ use libipld_core::{
     multihash::{Code, MultihashDigest},
 };
 use std::{collections::HashSet, matches};
-use tracing::instrument;
 use wnfs_common::BlockStore;
 
 /// A data structure that keeps state about incremental DAG verification.
@@ -57,7 +56,7 @@ impl IncrementalDagVerification {
     /// Updates the state of incremental dag verification.
     /// This goes through all "want" blocks and what they link to,
     /// removing items that we now have and don't want anymore.
-    #[instrument(level = "trace", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn update_have_cids(
         &mut self,
         store: &impl BlockStore,
@@ -191,7 +190,8 @@ impl IncrementalDagVerification {
             };
         }
 
-        let mut bloom = BloomFilter::new_from_fpr_po2(bloom_capacity, bloom_fpr(bloom_capacity));
+        let target_fpr = bloom_fpr(bloom_capacity);
+        let mut bloom = BloomFilter::new_from_fpr_po2(bloom_capacity, target_fpr);
 
         self.have_cids
             .into_iter()
@@ -202,6 +202,7 @@ impl IncrementalDagVerification {
             size_bits = bloom.as_bytes().len() * 8,
             hash_count = bloom.hash_count(),
             ones_count = bloom.count_ones(),
+            target_fpr,
             estimated_fpr = bloom.current_false_positive_rate(),
             "built 'have cids' bloom",
         );
