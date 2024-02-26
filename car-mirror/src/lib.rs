@@ -64,22 +64,19 @@ pub mod messages;
 /// let client_cache = InMemoryCache::new(100_000);
 /// let server_cache = InMemoryCache::new(100_000);
 ///
-/// let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// // At time of writing, Cargo.lock is 86KB, so this ends u ~8MB
+/// let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 ///
 /// // Load some data onto the client
 /// let root = FileBuilder::new()
 ///     .content_bytes(file_bytes.clone())
-///     .fixed_chunker(1024) // Generate lots of small blocks
-///     .degree(4)
 ///     .build()?
 ///     .store(&client_store)
 ///     .await?;
 ///
 /// // The server may already have a subset of the data
 /// FileBuilder::new()
-///     .content_bytes(file_bytes[0..10_000].to_vec())
-///     .fixed_chunker(1024) // Generate lots of small blocks
-///     .degree(4)
+///     .content_bytes(file_bytes[0..1_000_000].to_vec())
 ///     .build()?
 ///     .store(&server_store)
 ///     .await?;
@@ -107,20 +104,16 @@ pub mod messages;
 /// # let client_cache = InMemoryCache::new(100_000);
 /// # let server_cache = InMemoryCache::new(100_000);
 /// #
-/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 /// #
 /// # let root = FileBuilder::new()
 /// #     .content_bytes(file_bytes.clone())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
 /// #     .build()?
 /// #     .store(&client_store)
 /// #     .await?;
 /// #
 /// # FileBuilder::new()
-/// #     .content_bytes(file_bytes[0..10_000].to_vec())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
+/// #     .content_bytes(file_bytes[0..1_000_000].to_vec())
 /// #     .build()?
 /// #     .store(&server_store)
 /// #     .await?;
@@ -182,20 +175,16 @@ pub mod messages;
 /// # let client_cache = InMemoryCache::new(100_000);
 /// # let server_cache = InMemoryCache::new(100_000);
 /// #
-/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 /// #
 /// # let root = FileBuilder::new()
 /// #     .content_bytes(file_bytes.clone())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
 /// #     .build()?
 /// #     .store(&client_store)
 /// #     .await?;
 /// #
 /// # FileBuilder::new()
-/// #     .content_bytes(file_bytes[0..10_000].to_vec())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
+/// #     .content_bytes(file_bytes[0..1_000_000].to_vec())
 /// #     .build()?
 /// #     .store(&server_store)
 /// #     .await?;
@@ -260,22 +249,18 @@ pub mod pull;
 /// let client_cache = InMemoryCache::new(100_000);
 /// let server_cache = InMemoryCache::new(100_000);
 ///
-/// let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 ///
 /// // Load some data onto the client
 /// let root = FileBuilder::new()
 ///     .content_bytes(file_bytes.clone())
-///     .fixed_chunker(1024) // Generate lots of small blocks
-///     .degree(4)
 ///     .build()?
 ///     .store(&client_store)
 ///     .await?;
 ///
 /// // The server may already have a subset of the data
 /// FileBuilder::new()
-///     .content_bytes(file_bytes[0..10_000].to_vec())
-///     .fixed_chunker(1024) // Generate lots of small blocks
-///     .degree(4)
+///     .content_bytes(file_bytes[0..1_000_000].to_vec())
 ///     .build()?
 ///     .store(&server_store)
 ///     .await?;
@@ -303,20 +288,16 @@ pub mod pull;
 /// # let client_cache = InMemoryCache::new(100_000);
 /// # let server_cache = InMemoryCache::new(100_000);
 /// #
-/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 /// #
 /// # let root = FileBuilder::new()
 /// #     .content_bytes(file_bytes.clone())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
 /// #     .build()?
 /// #     .store(&client_store)
 /// #     .await?;
 /// #
 /// # FileBuilder::new()
-/// #     .content_bytes(file_bytes[0..10_000].to_vec())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
+/// #     .content_bytes(file_bytes[0..1_000_000].to_vec())
 /// #     .build()?
 /// #     .store(&server_store)
 /// #     .await?;
@@ -378,20 +359,16 @@ pub mod pull;
 /// # let client_cache = InMemoryCache::new(100_000);
 /// # let server_cache = InMemoryCache::new(100_000);
 /// #
-/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?;
+/// # let file_bytes = async_std::fs::read("../Cargo.lock").await?.repeat(100);
 /// #
 /// # let root = FileBuilder::new()
 /// #     .content_bytes(file_bytes.clone())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
 /// #     .build()?
 /// #     .store(&client_store)
 /// #     .await?;
 /// #
 /// # FileBuilder::new()
-/// #     .content_bytes(file_bytes[0..10_000].to_vec())
-/// #     .fixed_chunker(1024) // Generate lots of small blocks
-/// #     .degree(4)
+/// #     .content_bytes(file_bytes[0..1_000_000].to_vec())
 /// #     .build()?
 /// #     .store(&server_store)
 /// #     .await?;
