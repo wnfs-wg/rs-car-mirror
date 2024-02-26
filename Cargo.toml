@@ -16,6 +16,7 @@ libipld = "0.16"
 libipld-core = "0.16"
 serde_ipld_dagcbor = "0.4"
 wnfs-common = { version = "0.2.0" }
+wnfs-unixfs-file = { version = "0.2.0" }
 
 # See https://doc.rust-lang.org/cargo/reference/profiles.html for more info.
 [profile.release.package.car-mirror-wasm]

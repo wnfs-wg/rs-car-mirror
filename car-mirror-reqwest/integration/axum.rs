@@ -28,7 +28,8 @@ async fn main() -> Result<()> {
         .route("/dag/push/:cid", post(car_mirror_push))
         .with_state(ServerState::new());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3344").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await?;
+    let port = listener.local_addr()?.port();
     tokio::spawn(axum::serve(listener, app).into_future());
 
     // You can issue requests from your client like so:
@@ -40,13 +41,13 @@ async fn main() -> Result<()> {
 
     let client = Client::new();
     client
-        .post(format!("http://localhost:3344/dag/push/{root}"))
+        .post(format!("http://localhost:{port}/dag/push/{root}"))
         .run_car_mirror_push(root, &store, &NoCache) // rounds of push protocol
         .await?;
 
     let store = MemoryBlockStore::new(); // clear out data
     client
-        .get(format!("http://localhost:3344/dag/pull/{root}"))
+        .get(format!("http://localhost:{port}/dag/pull/{root}"))
         .run_car_mirror_pull(root, config, &store, &NoCache) // rounds of pull protocol
         .await?;
 
