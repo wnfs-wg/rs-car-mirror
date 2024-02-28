@@ -532,6 +532,7 @@ dependencies = [
  "async-stream",
  "bytes",
  "car-mirror",
+ "data-encoding",
  "deterministic-bloom",
  "futures",
  "iroh-car",
@@ -541,7 +542,9 @@ dependencies = [
  "quick_cache",
  "roaring-graphs",
  "serde",
+ "serde_bytes",
  "serde_ipld_dagcbor",
+ "serde_json",
  "test-log",
  "test-strategy",
  "testresult",
@@ -578,6 +581,7 @@ dependencies = [
  "bytes",
  "car-mirror",
  "futures",
+ "http 0.2.11",
  "libipld",
  "reqwest",
  "reqwest-middleware",
@@ -587,22 +591,33 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "wnfs-common",
+ "wnfs-unixfs-file",
 ]
 
 [[package]]
 name = "car-mirror-wasm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bytes",
+ "car-mirror",
  "console_error_panic_hook",
+ "futures",
  "js-sys",
+ "libipld",
+ "serde_json",
+ "tokio-util",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasm-streams",
  "web-sys",
+ "wnfs-common",
 ]
 
 [[package]]
@@ -2478,9 +2493,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.113"
+version = "1.0.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69801b70b1c3dac963ecb03a364ba0ceda9cf60c71cfe475e99864759c8b8a79"
+checksum = "c5f09b1bd632ef549eaa9f60a1f8de742bdbc698e6cee2095fc84dde5f549ae0"
 dependencies = [
  "itoa",
  "ryu",
@@ -2848,6 +2863,7 @@ checksum = "5419f34732d9eb6ee4c3578b7989078579b7f039cbbb9ca2c4da015749371e15"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "pin-project-lite",
  "tokio",
@@ -2877,6 +2893,22 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
+dependencies = [
+ "bitflags 2.4.2",
+ "bytes",
+ "http 1.0.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]

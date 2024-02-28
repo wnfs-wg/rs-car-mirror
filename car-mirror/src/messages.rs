@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PullRequest {
     /// Requested CID roots
-    #[serde(rename = "rs")]
+    #[serde(rename = "rs", with = "crate::serde_cid_vec")]
     pub resources: Vec<Cid>,
 
     /// A bloom containing already stored blocks
@@ -25,7 +25,7 @@ pub struct PullRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PushResponse {
     /// Incomplete subgraph roots
-    #[serde(rename = "sr")]
+    #[serde(rename = "sr", with = "crate::serde_cid_vec")]
     pub subgraph_roots: Vec<Cid>,
 
     /// A bloom containing already stored blocks
@@ -42,6 +42,7 @@ pub struct Bloom {
 
     /// Bloom filter Binary
     #[serde(rename = "bb")]
+    #[serde(with = "crate::serde_bloom_bytes")]
     pub bytes: Vec<u8>,
 }
 
@@ -56,5 +57,50 @@ impl PullRequest {
     /// Whether you need to actually send the request or not. If true, this indicates that the protocol is finished.
     pub fn indicates_finished(&self) -> bool {
         self.resources.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        cache::NoCache,
+        common::Config,
+        incremental_verification::IncrementalDagVerification,
+        messages::{PullRequest, PushResponse},
+    };
+    use testresult::TestResult;
+    use wnfs_common::MemoryBlockStore;
+    use wnfs_unixfs_file::builder::FileBuilder;
+
+    #[test_log::test(async_std::test)]
+    async fn test_encoding_format() -> TestResult {
+        let store = &MemoryBlockStore::new();
+        let store2 = &MemoryBlockStore::new();
+
+        let previous_cid = FileBuilder::new()
+            .content_bytes(vec![42; 500_000])
+            .build()?
+            .store(store)
+            .await?;
+
+        let root_cid = FileBuilder::new()
+            .content_bytes(vec![42; 1_000_000])
+            .build()?
+            .store(store2)
+            .await?;
+
+        let mut dag = IncrementalDagVerification::new([previous_cid], store, &NoCache).await?;
+        dag.want_cids.insert(root_cid);
+        dag.update_have_cids(store, &NoCache).await?;
+
+        let receiver_state = dag.into_receiver_state(Config::default().bloom_fpr);
+
+        let pull_request: PullRequest = receiver_state.clone().into();
+        let push_response: PushResponse = receiver_state.into();
+
+        println!("{}", serde_json::to_string_pretty(&pull_request)?);
+        println!("{}", serde_json::to_string_pretty(&push_response)?);
+
+        Ok(())
     }
 }

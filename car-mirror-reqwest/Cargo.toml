@@ -34,14 +34,15 @@ wnfs-common = { workspace = true }
 axum = "0.7"
 axum-macros = "0.4"
 car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
+http = "0.2"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 test-strategy = "0.3"
 testresult = "0.3"
 tokio = { version = "1.0", features = ["full"] }
+tower-http = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
-
-[features]
+wnfs-unixfs-file = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
