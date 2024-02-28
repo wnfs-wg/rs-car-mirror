@@ -34,6 +34,7 @@ wnfs-common = { workspace = true }
 axum = "0.7"
 axum-macros = "0.4"
 car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
+car-mirror-axum = { path = "../car-mirror-axum" }
 http = "0.2"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
@@ -47,7 +48,3 @@ wnfs-unixfs-file = { workspace = true }
 all-features = true
 # defines the configuration attribute `docsrs`
 rustdoc-args = ["--cfg", "docsrs"]
-
-[[test]]
-name = "integration"
-path = "integration/axum.rs"

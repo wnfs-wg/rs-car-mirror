@@ -610,6 +610,7 @@ dependencies = [
  "axum-macros",
  "bytes",
  "car-mirror",
+ "car-mirror-axum",
  "futures",
  "http 0.2.11",
  "libipld",

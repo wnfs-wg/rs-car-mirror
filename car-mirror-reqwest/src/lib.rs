@@ -6,21 +6,26 @@
 //!
 //! A helper library that helps making car-mirror client requests using reqwest.
 //!
-//! ```no_run
+//! ## Examples
+//!
+//! ```
 //! # use anyhow::Result;
 //! use car_mirror::{cache::NoCache, common::Config};
 //! use car_mirror_reqwest::RequestBuilderExt;
+//! use reqwest::Client;
 //! use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_RAW};
 //!
-//! # #[tokio::main]
+//! # #[test_log::test(tokio::main)]
 //! # async fn main() -> Result<()> {
+//! // Say, you have a webserver that supports car-mirror requests running:
+//! tokio::spawn(car_mirror_axum::serve(MemoryBlockStore::new()));
+//!
+//! // You can issue requests from your client like so:
 //! let store = MemoryBlockStore::new();
 //! let data = b"Hello, world!".to_vec();
 //! let root = store.put_block(data, CODEC_RAW).await?;
 //!
-//! let config = &Config::default();
-//!
-//! let client = reqwest::Client::new();
+//! let client = Client::new();
 //! client
 //!     .post(format!("http://localhost:3344/dag/push/{root}"))
 //!     .run_car_mirror_push(root, &store, &NoCache) // rounds of push protocol
@@ -29,15 +34,13 @@
 //! let store = MemoryBlockStore::new(); // clear out data
 //! client
 //!     .get(format!("http://localhost:3344/dag/pull/{root}"))
-//!     .run_car_mirror_pull(root, config, &store, &NoCache) // rounds of pull protocol
+//!     .run_car_mirror_pull(root, &Config::default(), &store, &NoCache) // rounds of pull protocol
 //!     .await?;
 //!
 //! assert!(store.has_block(&root).await?);
 //! # Ok(())
 //! # }
 //! ```
-//!
-//! For the full example, please see `integration/axum.rs` in the source repository.
 
 mod error;
 mod request;
