@@ -1,3 +1,10 @@
+use crate::{
+    cache::Cache,
+    dag_walk::DagWalk,
+    error::Error,
+    incremental_verification::{BlockState, IncrementalDagVerification},
+    messages::{PullRequest, PushResponse},
+};
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
 use futures::{StreamExt, TryStreamExt};
@@ -8,14 +15,6 @@ use std::io::Cursor;
 use wnfs_common::{
     utils::{boxed_stream, BoxStream, CondSend},
     BlockStore,
-};
-
-use crate::{
-    cache::Cache,
-    dag_walk::DagWalk,
-    error::Error,
-    incremental_verification::{BlockState, IncrementalDagVerification},
-    messages::{Bloom, PullRequest, PushResponse},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -517,23 +516,28 @@ impl From<PushResponse> for ReceiverState {
     fn from(push: PushResponse) -> Self {
         let PushResponse {
             subgraph_roots,
-            bloom,
+            bloom_hash_count: hash_count,
+            bloom_bytes: bytes,
         } = push;
 
         Self {
             missing_subgraph_roots: subgraph_roots,
-            have_cids_bloom: Self::bloom_deserialize(bloom),
+            have_cids_bloom: Self::bloom_deserialize(hash_count, bytes),
         }
     }
 }
 
 impl From<PullRequest> for ReceiverState {
     fn from(pull: PullRequest) -> Self {
-        let PullRequest { resources, bloom } = pull;
+        let PullRequest {
+            resources,
+            bloom_hash_count: hash_count,
+            bloom_bytes: bytes,
+        } = pull;
 
         Self {
             missing_subgraph_roots: resources,
-            have_cids_bloom: Self::bloom_deserialize(bloom),
+            have_cids_bloom: Self::bloom_deserialize(hash_count, bytes),
         }
     }
 }
@@ -545,11 +549,12 @@ impl From<ReceiverState> for PushResponse {
             have_cids_bloom,
         } = receiver_state;
 
-        let bloom = ReceiverState::bloom_serialize(have_cids_bloom);
+        let (hash_count, bytes) = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PushResponse {
             subgraph_roots: missing_subgraph_roots,
-            bloom,
+            bloom_hash_count: hash_count,
+            bloom_bytes: bytes,
         }
     }
 }
@@ -561,36 +566,31 @@ impl From<ReceiverState> for PullRequest {
             have_cids_bloom,
         } = receiver_state;
 
-        let bloom = ReceiverState::bloom_serialize(have_cids_bloom);
+        let (hash_count, bytes) = ReceiverState::bloom_serialize(have_cids_bloom);
 
         PullRequest {
             resources: missing_subgraph_roots,
-            bloom,
+            bloom_hash_count: hash_count,
+            bloom_bytes: bytes,
         }
     }
 }
 
 impl ReceiverState {
-    fn bloom_serialize(bloom: Option<BloomFilter>) -> Bloom {
+    fn bloom_serialize(bloom: Option<BloomFilter>) -> (u32, Vec<u8>) {
         match bloom {
-            Some(bloom) => Bloom {
-                hash_count: bloom.hash_count() as u32,
-                bytes: bloom.as_bytes().to_vec(),
-            },
-            None => Bloom {
-                hash_count: 3,
-                bytes: Vec::new(),
-            },
+            Some(bloom) => (bloom.hash_count() as u32, bloom.as_bytes().to_vec()),
+            None => (3, Vec::new()),
         }
     }
 
-    fn bloom_deserialize(bloom: Bloom) -> Option<BloomFilter> {
-        if bloom.bytes.is_empty() {
+    fn bloom_deserialize(hash_count: u32, bytes: Vec<u8>) -> Option<BloomFilter> {
+        if bytes.is_empty() {
             None
         } else {
             Some(BloomFilter::new_with(
-                bloom.hash_count as usize,
-                bloom.bytes.into_boxed_slice(),
+                hash_count as usize,
+                bytes.into_boxed_slice(),
             ))
         }
     }

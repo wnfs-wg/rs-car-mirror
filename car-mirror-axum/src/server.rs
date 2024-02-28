@@ -16,7 +16,10 @@ use futures::TryStreamExt;
 use libipld::Cid;
 use std::str::FromStr;
 use tokio_util::io::StreamReader;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::{DefaultMakeSpan, TraceLayer},
+};
 use wnfs_common::BlockStore;
 
 /// TODO(matheus23): docs
@@ -38,6 +41,9 @@ pub fn app(store: impl BlockStore + Clone + 'static) -> Router {
     Router::new()
         .nest("/dag", dag_router(store))
         .layer(cors)
+        .layer(
+            TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::new().include_headers(true)),
+        )
         .fallback(not_found)
 }
 
@@ -68,14 +74,13 @@ impl<B: BlockStore + Clone + 'static> ServerState<B> {
 }
 
 /// TODO(matheus23): docs
-#[tracing::instrument(skip(state))]
+#[tracing::instrument(skip(state), err, ret)]
 pub async fn car_mirror_push<B: BlockStore + Clone + 'static>(
     State(state): State<ServerState<B>>,
     Path(cid_string): Path<String>,
     body: Body,
 ) -> AppResult<(StatusCode, DagCbor<PushResponse>)>
 where {
-    tracing::info!("Handling request");
     let cid = Cid::from_str(&cid_string)?;
 
     let body_stream = body.into_data_stream();
@@ -101,13 +106,12 @@ where {
 }
 
 /// TODO(matheus23): docs
-#[tracing::instrument(skip(state))]
+#[tracing::instrument(skip(state), err, ret)]
 pub async fn car_mirror_pull<B: BlockStore + Clone + 'static>(
     State(state): State<ServerState<B>>,
     Path(cid_string): Path<String>,
     DagCbor(request): DagCbor<PullRequest>,
 ) -> AppResult<(StatusCode, Body)> {
-    tracing::info!("Handling request");
     let cid = Cid::from_str(&cid_string)?;
 
     let car_chunks = car_mirror::pull::response_streaming(

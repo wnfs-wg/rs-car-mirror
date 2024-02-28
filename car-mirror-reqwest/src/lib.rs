@@ -33,7 +33,7 @@
 //!
 //! let store = MemoryBlockStore::new(); // clear out data
 //! client
-//!     .get(format!("http://localhost:3344/dag/pull/{root}"))
+//!     .post(format!("http://localhost:3344/dag/pull/{root}"))
 //!     .run_car_mirror_pull(root, &Config::default(), &store, &NoCache) // rounds of pull protocol
 //!     .await?;
 //!

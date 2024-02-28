@@ -25,6 +25,7 @@ futures = "0.3"
 libipld = "0.16"
 reqwest = { version = "0.11", default-features = false, features = ["json", "stream"] }
 reqwest-middleware = "0.2"
+serde_ipld_dagcbor = { workspace = true }
 thiserror = "1.0"
 tokio-util = { version = "0.7", features = ["io"] }
 tracing = "0.1"
