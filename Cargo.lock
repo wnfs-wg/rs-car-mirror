@@ -558,6 +558,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "car-mirror-axum"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "axum-macros",
+ "bytes",
+ "car-mirror",
+ "futures",
+ "http 0.2.11",
+ "libipld",
+ "mime",
+ "reqwest",
+ "serde",
+ "serde_ipld_dagcbor",
+ "test-log",
+ "test-strategy",
+ "testresult",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "wnfs-common",
+ "wnfs-unixfs-file",
+]
+
+[[package]]
 name = "car-mirror-benches"
 version = "0.1.0"
 dependencies = [
@@ -591,7 +621,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
- "tower-http",
  "tracing",
  "tracing-subscriber",
  "wnfs-common",

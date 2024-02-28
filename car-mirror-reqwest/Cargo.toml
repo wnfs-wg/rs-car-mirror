@@ -40,7 +40,6 @@ test-log = { version = "0.2", default-features = false, features = ["trace"] }
 test-strategy = "0.3"
 testresult = "0.3"
 tokio = { version = "1.0", features = ["full"] }
-tower-http = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
 wnfs-unixfs-file = { workspace = true }
 

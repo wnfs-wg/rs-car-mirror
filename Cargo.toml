@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	"car-mirror",
+	"car-mirror-axum",
 	"car-mirror-benches",
 	"car-mirror-reqwest",
 	"car-mirror-wasm",
