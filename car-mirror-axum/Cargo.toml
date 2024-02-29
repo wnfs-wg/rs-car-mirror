@@ -20,7 +20,7 @@ doctest = true
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-axum = "0.7"
+axum = { version = "0.7", features = ["http1", "http2"] }
 axum-macros = "0.4"
 bytes = "1.4"
 car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
@@ -32,7 +32,7 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 serde = "^1"
 serde_ipld_dagcbor = { workspace = true }
 thiserror = "1.0"
-tokio = { version = "1.0" }
+tokio = { version = "1.0", features = ["rt-multi-thread"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 tracing = "0.1"
