@@ -571,6 +571,8 @@ dependencies = [
  "http 0.2.11",
  "libipld",
  "mime",
+ "rand",
+ "rand_chacha",
  "reqwest",
  "serde",
  "serde_ipld_dagcbor",
