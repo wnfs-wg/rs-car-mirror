@@ -3,7 +3,9 @@ use crate::{
     messages::{PullRequest, PushResponse},
     utils::{handle_jserr, parse_cid},
 };
+use bytes::BytesMut;
 use car_mirror::{cache::NoCache, common::Config};
+use futures::StreamExt;
 use futures::TryStreamExt;
 use js_sys::{Error, Promise, Uint8Array};
 use std::rc::Rc;
@@ -117,24 +119,55 @@ pub fn pull_request(root_cid: Vec<u8>, store: BlockStore) -> Result<Promise, Err
 #[wasm_bindgen]
 pub fn pull_handle_response_streaming(
     root_cid: Vec<u8>,
-    stream: web_sys::ReadableStream,
+    readable_stream: web_sys::ReadableStream,
     store: BlockStore,
 ) -> Result<Promise, Error> {
     let store = ForeignBlockStore(store);
     let root = parse_cid(root_cid)?;
-    let stream = ReadableStream::from_raw(stream);
+    let readable_stream = ReadableStream::from_raw(readable_stream);
 
     Ok(future_to_promise(async move {
-        let pull_request = car_mirror::pull::handle_response_streaming(
-            root,
-            stream.into_async_read().compat(),
-            &Config::default(),
-            store,
-            NoCache,
-        )
-        .await
-        .map_err(handle_jserr)?;
+        let pull_request = match readable_stream.try_into_async_read() {
+            Ok(async_read) => car_mirror::pull::handle_response_streaming(
+                root,
+                async_read.compat(),
+                &Config::default(),
+                store,
+                NoCache,
+            )
+            .await
+            .map_err(handle_jserr)?,
 
+            // If BYOB readers are unsupported:
+            Err((_, readable_stream)) => {
+                let stream = readable_stream
+                        .into_stream()
+                        .map(|result| result.and_then(convert_jsvalue_to_bytes))
+                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Error while trying to read item from stream or trying to convert the item into bytes on the rust side."));
+
+                let async_read = tokio_util::io::StreamReader::new(stream);
+
+                car_mirror::pull::handle_response_streaming(
+                    root,
+                    async_read,
+                    &Config::default(),
+                    store,
+                    NoCache,
+                )
+                .await
+                .map_err(handle_jserr)?
+            }
+        };
         Ok(PullRequest(Rc::new(pull_request)).into())
     }))
+}
+
+fn convert_jsvalue_to_bytes(js_value: JsValue) -> Result<BytesMut, JsValue> {
+    let uint8array = Uint8Array::new(&js_value);
+
+    let mut result = BytesMut::with_capacity(uint8array.length() as usize);
+    result.resize(uint8array.length() as usize, 0);
+    uint8array.copy_to(&mut result);
+
+    Ok(result)
 }

@@ -64,9 +64,8 @@ export async function runCarMirrorPull(serverUrl, cidString, store) {
             method: "POST",
             body: request.encode()
         });
-        console.debug("Got response status", response.status, response.body.locked);
+        console.debug("Got response status", response.status);
         if (200 <= response.status && response.status < 300) {
-            response.body.getReader().releaseLock();
             request = await pull_handle_response_streaming(cid.bytes, response.body, store);
         } else {
             throw new Error(`Unexpected status code in car-mirror pull response: ${response.status}, body: ${await response.text()}`);

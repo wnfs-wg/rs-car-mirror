@@ -31,6 +31,7 @@
   "scripts": {
     "build": "wireit",
     "test": "wireit",
+    "http-server": "wireit",
     "release": "export PROFILE=release && export TARGET_DIR=release && npm run build"
   },
   "wireit": {
@@ -48,7 +49,13 @@
       }
     },
     "opt": {
-      "command": "wasm-opt -O1 ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm -o ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "command": "wasm-opt -O1 ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm -o ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm",
+      "files": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm"
+      ],
+      "output": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm"
+      ],
       "env": {
         "TARGET_DIR": {
           "external": true,
@@ -61,6 +68,9 @@
     },
     "bindgen:bundler": {
       "command": "wasm-bindgen --weak-refs --target bundler --out-dir dist/bundler ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "files": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm"
+      ],
       "env": {
         "TARGET_DIR": {
           "external": true,
@@ -133,7 +143,9 @@
           "lineMatches": "Available on:.*"
         }
       },
-      "dependencies": []
+      "dependencies": [
+        "bindgen:web"
+      ]
     },
     "car-mirror-server": {
       "command": "cargo run -p car-mirror-axum --example serve_test_data",
