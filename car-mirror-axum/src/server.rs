@@ -1,4 +1,5 @@
 use crate::{extract::dag_cbor::DagCbor, AppResult};
+use anyhow::Result;
 use axum::{
     body::{Body, HttpBody},
     extract::{Path, State},
@@ -20,6 +21,15 @@ use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use wnfs_common::BlockStore;
+
+/// TODO(matheus23): docs
+pub async fn serve(store: impl BlockStore + Clone + 'static) -> Result<()> {
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3344").await?;
+    let addr = listener.local_addr()?;
+    println!("Listening on {addr}");
+    axum::serve(listener, app(store)).await?;
+    Ok(())
+}
 
 /// TODO(matheus23): docs
 pub fn app(store: impl BlockStore + Clone + 'static) -> Router {
