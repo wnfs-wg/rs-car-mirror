@@ -105,18 +105,8 @@ jobs:
       - name: Run Tests
         run: cargo test --manifest-path car-mirror/Cargo.toml --all-features
 
-  run-headless-tests:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-latest ]
-        browser: [ firefox, chrome ]
-
-        # include:
-        # bug w/ wasm-bindgen: https://github.com/rustwasm/wasm-bindgen/issues/3004
-          # - os: macos-latest
-          #   browser: safari
+  run-playwright-tests:
+    runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -126,8 +116,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@v1.6.3
+
+      - name: Install wasm-bindgen
+        run: cargo binstall wasm-bindgen-cli
+
+      - name: Install wasm-opt (via binaryen)
+        run: sudo apt-get install -y binaryen
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
 
       - name: Cache Project
         uses: Swatinem/rust-cache@v2
@@ -138,5 +140,5 @@ jobs:
           override: true
           toolchain: stable
 
-      - name: Run Rust Headless Browser Tests
-        run: wasm-pack test --headless --${{ matrix.browser }}
+      - name: Run Playwright tests
+        run: npx playwright test
