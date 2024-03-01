@@ -36,6 +36,10 @@
   "wireit": {
     "compile": {
       "command": "cargo build --target wasm32-unknown-unknown --profile $PROFILE",
+      "files": [
+        "src/**/*.rs",
+        "src/*.rs"
+      ],
       "env": {
         "PROFILE": {
           "external": true,
@@ -123,7 +127,7 @@
       ]
     },
     "http-server": {
-      "command": "http-server .",
+      "command": "http-server . --port 8081",
       "service": {
         "readyWhen": {
           "lineMatches": "Available on:.*"
@@ -136,7 +140,7 @@
       "env": {
         "RUST_LOG": {
           "external": true,
-          "default": "debug"
+          "default": "car_mirror_axum=debug,car_mirror=debug"
         }
       },
       "service": {
