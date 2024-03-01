@@ -1,6 +1,8 @@
-use crate::blockstore::{BlockStore, ForeignBlockStore};
-use crate::messages::{PullRequest, PushResponse};
-use crate::utils::{handle_jserr, parse_cid};
+use crate::{
+    blockstore::{BlockStore, ForeignBlockStore},
+    messages::{PullRequest, PushResponse},
+    utils::{handle_jserr, parse_cid},
+};
 use car_mirror::{cache::NoCache, common::Config};
 use futures::TryStreamExt;
 use js_sys::{Error, Promise, Uint8Array};

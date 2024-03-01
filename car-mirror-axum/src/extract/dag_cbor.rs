@@ -85,7 +85,7 @@ where
     type Rejection = DagCborRejection;
 
     #[tracing::instrument(skip_all, ret, err)]
-    #[allow(clippy::blocks_in_conditions)]
+    #[allow(clippy::style)] // clippy::blocks_in_conditions in tracing::instrument https://github.com/rust-lang/rust-clippy/issues/12281
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         let mime = req
             .headers()
