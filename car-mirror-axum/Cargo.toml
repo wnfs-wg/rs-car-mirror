@@ -22,13 +22,14 @@ anyhow = "1.0"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["http1", "http2"] }
 axum-macros = "0.4"
+axum-server = { version = "0.6.0", features = ["tls-rustls"] }
 bytes = "1.4"
 car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
 futures = "0.3"
-http = "0.2"
+http = "1.0"
 libipld = "0.16"
 mime = "0.3"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
+rcgen = "0.12.1"
 serde = "^1"
 serde_ipld_dagcbor = { workspace = true }
 thiserror = "1.0"
@@ -40,6 +41,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parki
 wnfs-common = { workspace = true }
 
 [dev-dependencies]
+axum-server-dual-protocol = "0.6.0"
 rand = "0.8"
 rand_chacha = "0.3"
 test-log = { version = "0.2", default-features = false, features = ["trace"] }

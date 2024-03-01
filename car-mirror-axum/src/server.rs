@@ -1,7 +1,6 @@
 use crate::{extract::dag_cbor::DagCbor, AppResult};
-use anyhow::Result;
 use axum::{
-    body::Body,
+    body::{Body, HttpBody},
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
@@ -21,15 +20,6 @@ use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use wnfs_common::BlockStore;
-
-/// TODO(matheus23): docs
-pub async fn serve(store: impl BlockStore + Clone + 'static) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3344").await?;
-    let addr = listener.local_addr()?;
-    println!("Listening on {addr}");
-    axum::serve(listener, app(store)).await?;
-    Ok(())
-}
 
 /// TODO(matheus23): docs
 pub fn app(store: impl BlockStore + Clone + 'static) -> Router {
@@ -83,20 +73,34 @@ pub async fn car_mirror_push<B: BlockStore + Clone + 'static>(
 where {
     let cid = Cid::from_str(&cid_string)?;
 
+    let content_length = body.size_hint().exact();
     let body_stream = body.into_data_stream();
 
-    let reader = StreamReader::new(
+    tracing::info!(content_length, "Parsed content length hint");
+
+    let mut reader = StreamReader::new(
         body_stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
     );
 
     let response = car_mirror::push::response_streaming(
         cid,
-        reader,
+        &mut reader,
         &Config::default(),
         &state.store,
         &state.cache,
     )
     .await?;
+
+    if content_length.is_some() {
+        tracing::info!("Draining request");
+        // If the client provided a `Content-Length` value, then
+        // we know the client didn't stream the request.
+        // In that case, it's common that the client doesn't support
+        // getting a response before it finished finished sending,
+        // because the socket closes early, before the client manages
+        // to read the response.
+        tokio::io::copy(&mut reader, &mut tokio::io::sink()).await?;
+    }
 
     if response.indicates_finished() {
         Ok((StatusCode::OK, DagCbor(response)))
@@ -110,9 +114,17 @@ where {
 pub async fn car_mirror_pull<B: BlockStore + Clone + 'static>(
     State(state): State<ServerState<B>>,
     Path(cid_string): Path<String>,
-    DagCbor(request): DagCbor<PullRequest>,
+    pull_request: Option<DagCbor<PullRequest>>,
 ) -> AppResult<(StatusCode, Body)> {
     let cid = Cid::from_str(&cid_string)?;
+
+    let DagCbor(request) = pull_request.unwrap_or_else(|| {
+        DagCbor(PullRequest {
+            resources: vec![cid],
+            bloom_hash_count: 3,
+            bloom_bytes: vec![],
+        })
+    });
 
     let car_chunks = car_mirror::pull::response_streaming(
         cid,
