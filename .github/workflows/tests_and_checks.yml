@@ -126,7 +126,7 @@ jobs:
         run: sudo apt-get install -y binaryen
 
       - name: Install NPM dependencies
-        run: npm ci
+        run: npm i
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
@@ -141,4 +141,4 @@ jobs:
           toolchain: stable
 
       - name: Run Playwright tests
-        run: npx playwright test
+        run: npm test
