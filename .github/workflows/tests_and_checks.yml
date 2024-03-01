@@ -134,11 +134,19 @@ jobs:
       - name: Cache Project
         uses: Swatinem/rust-cache@v2
 
+      - name: Cache Project (JavaScript)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
           override: true
           toolchain: stable
+
+      - name: Setup WebAssembly Toolchain
+        run: rustup target add wasm32-unknown-unknown
 
       - name: Run Playwright tests
         run: npm test
