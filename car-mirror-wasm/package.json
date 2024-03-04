@@ -1,0 +1,198 @@
+{
+  "name": "car-mirror",
+  "version": "0.1.0",
+  "description": "Wasm bindings to the rust implementation of the car mirror protocol",
+  "main": "index.js",
+  "type": "module",
+  "module": "dist/bundler/car_mirror_wasm.js",
+  "types": "dist/nodejs/car_mirror_wasm.d.ts",
+  "exports": {
+    ".": {
+      "browser": "./dist/bundler/car_mirror_wasm.js",
+      "node": "./dist/nodejs/car_mirror_wasm.cjs",
+      "default": "./dist/bundler/car_mirror_wasm.js",
+      "types": "./dist/nodejs/car_mirror_wasm.d.ts"
+    },
+    "./nodejs": {
+      "default": "./dist/nodejs/car_mirror_wasm.cjs",
+      "types": "./dist/nodejs/car_mirror_wasm.d.ts"
+    },
+    "./web": {
+      "default": "./dist/web/car_mirror_wasm.js",
+      "types": "./dist/web/car_mirror_wasm.d.ts"
+    }
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fission-codes/rs-car-mirror.git"
+  },
+  "author": "Philipp Krüger <philipp@fission.codes>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/fission-codes/rs-car-mirror/issues"
+  },
+  "homepage": "https://github.com/fission-codes/rs-car-mirror#readme",
+  "dependencies": {
+    "@ipld/unixfs": "^3.0.0",
+    "fetch-h2": "^3.0.2",
+    "multiformats": "^13.1.0",
+    "playwright-test": "^14.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0",
+    "@types/node": "^20.11.24",
+    "http-server": "^14.1.1",
+    "wireit": "^0.14.4"
+  },
+  "scripts": {
+    "build": "wireit",
+    "test": "wireit",
+    "http-server": "wireit",
+    "release": "export PROFILE=release && export TARGET_DIR=release && npm run build"
+  },
+  "wireit": {
+    "compile": {
+      "command": "cargo build --target wasm32-unknown-unknown --profile $PROFILE",
+      "files": [
+        "src/**/*.rs",
+        "src/*.rs"
+      ],
+      "env": {
+        "PROFILE": {
+          "external": true,
+          "default": "dev"
+        }
+      }
+    },
+    "opt": {
+      "command": "wasm-opt -O1 ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm -o ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm",
+      "files": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm"
+      ],
+      "output": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm"
+      ],
+      "env": {
+        "TARGET_DIR": {
+          "external": true,
+          "default": "debug"
+        }
+      },
+      "dependencies": [
+        "compile"
+      ]
+    },
+    "bindgen:bundler": {
+      "command": "wasm-bindgen --weak-refs --target bundler --out-dir dist/bundler ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "files": [
+        "../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm-opt.wasm"
+      ],
+      "env": {
+        "TARGET_DIR": {
+          "external": true,
+          "default": "debug"
+        }
+      },
+      "dependencies": [
+        "opt"
+      ],
+      "output": [
+        "dist/bundler"
+      ]
+    },
+    "bindgen:nodejs": {
+      "command": "wasm-bindgen --weak-refs --target nodejs --out-dir dist/nodejs ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "env": {
+        "TARGET_DIR": {
+          "external": true,
+          "default": "debug"
+        }
+      },
+      "dependencies": [
+        "opt"
+      ],
+      "output": [
+        "dist/nodejs"
+      ]
+    },
+    "bindgen:web": {
+      "command": "wasm-bindgen --weak-refs --target web --out-dir dist/web ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "env": {
+        "TARGET_DIR": {
+          "external": true,
+          "default": "debug"
+        }
+      },
+      "dependencies": [
+        "opt"
+      ],
+      "output": [
+        "dist/web"
+      ]
+    },
+    "bindgen:browser": {
+      "command": "wasm-bindgen --weak-refs --target web --browser --out-dir dist/web ../target/wasm32-unknown-unknown/$TARGET_DIR/car_mirror_wasm.wasm",
+      "env": {
+        "TARGET_DIR": {
+          "external": true,
+          "default": "debug"
+        }
+      },
+      "dependencies": [
+        "opt"
+      ],
+      "output": [
+        "dist/web"
+      ]
+    },
+    "build": {
+      "dependencies": [
+        "bindgen:bundler",
+        "bindgen:nodejs",
+        "bindgen:web"
+      ]
+    },
+    "http-server": {
+      "command": "http-server . --port 8081",
+      "service": {
+        "readyWhen": {
+          "lineMatches": "Available on:.*"
+        }
+      },
+      "dependencies": [
+        "bindgen:web"
+      ]
+    },
+    "car-mirror-server": {
+      "command": "cargo run -p car-mirror-axum --example serve_test_data",
+      "env": {
+        "RUST_LOG": {
+          "external": true,
+          "default": "car_mirror_axum=debug,car_mirror=debug"
+        }
+      },
+      "service": {
+        "readyWhen": {
+          "lineMatches": "Listening on 0.0.0.0:3344"
+        }
+      }
+    },
+    "test": {
+      "command": "playwright-test 'test/**/*.spec.js'",
+      "dependencies": [
+        "bindgen:bundler",
+        "http-server",
+        "car-mirror-server"
+      ]
+    }
+  },
+  "playwright-test": {
+    "browserContextOptions": {
+      "baseURL": "http://127.0.0.1:8081",
+      "ignoreHTTPSErrors": true
+    }
+  }
+}

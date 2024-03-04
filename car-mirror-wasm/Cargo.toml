@@ -11,37 +11,36 @@ edition = "2021"
 rust-version = "1.75"
 documentation = "https://docs.rs/car-mirror-wasm"
 repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-wasm"
-authors = ["Philipp Krüger <pihlipp@fission.codes>"]
+authors = ["Philipp Krüger <philipp@fission.codes>"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+anyhow = { workspace = true }
+bytes = { workspace = true }
+car-mirror = { path = "../car-mirror" }
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
-console_error_panic_hook = { version = "0.1", optional = true }
-js-sys = { version = "0.3", optional = true }
+console_error_panic_hook = { version = "0.1" }
+futures = { workspace = true }
+js-sys = { version = "0.3" }
+libipld = { workspace = true }
+serde-wasm-bindgen = "0.6.5"
+serde_json = { workspace = true }
+tokio-util = { workspace = true, features = ["compat", "io"] }
 tracing = "0.1"
-wasm-bindgen = { version = "0.2", optional = true, features = ["serde-serialize"] }
-wasm-bindgen-futures = { version = "0.4", optional = true }
-web-sys = { version = "0.3", optional = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-streams = "0.4"
+web-sys = { version = "0.3" }
+wnfs-common = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
-
-[features]
-default = ["js"]
-full = ["js", "web"]
-js = [
-  "console_error_panic_hook",
-  "js-sys",
-  "wasm-bindgen",
-  "wasm-bindgen-futures"
-]
-web = ["web-sys"]
 
 [package.metadata.docs.rs]
 all-features = true

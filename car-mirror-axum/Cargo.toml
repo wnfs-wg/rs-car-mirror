@@ -1,0 +1,55 @@
+[package]
+name = "car-mirror-axum"
+version = "0.1.0"
+description = "A library for building axum webservers that use car-mirror and a test axum webserver binary"
+keywords = []
+categories = []
+include = ["/src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+license = "Apache-2.0"
+readme = "README.md"
+edition = "2021"
+rust-version = "1.66"
+documentation = "https://docs.rs/car-mirror-axum"
+repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-axum"
+authors = ["Philipp Krüger <philipp@fission.codes>"]
+
+[lib]
+path = "src/lib.rs"
+doctest = true
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+axum = { version = "0.7", features = ["http1", "http2"] }
+axum-macros = "0.4"
+axum-server = { version = "0.6.0", features = ["tls-rustls"] }
+bytes = "1.4"
+car-mirror = { version = "0.1", path = "../car-mirror", features = ["quick_cache"] }
+futures = "0.3"
+http = "1.0"
+libipld = "0.16"
+mime = "0.3"
+rcgen = "0.12.1"
+serde = "^1"
+serde_ipld_dagcbor = { workspace = true }
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["rt-multi-thread"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "parking_lot", "registry"] }
+wnfs-common = { workspace = true }
+
+[dev-dependencies]
+axum-server-dual-protocol = "0.6.0"
+rand = "0.8"
+rand_chacha = "0.3"
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
+test-strategy = "0.3"
+testresult = "0.3"
+wnfs-unixfs-file = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

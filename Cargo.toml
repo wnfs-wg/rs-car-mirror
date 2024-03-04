@@ -1,10 +1,10 @@
 [workspace]
 members = [
 	"car-mirror",
+	"car-mirror-axum",
 	"car-mirror-benches",
 	"car-mirror-reqwest",
 	"car-mirror-wasm",
-	"examples",
 ]
 
 [workspace.dependencies]
@@ -15,6 +15,11 @@ futures = "0.3"
 libipld = "0.16"
 libipld-core = "0.16"
 serde_ipld_dagcbor = "0.4"
+serde_bytes = "0.11"
+serde_json = "1.0"
+tokio-util = "0.7.8"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = { version = "0.4" }
 wnfs-common = { version = "0.2.0" }
 wnfs-unixfs-file = { version = "0.2.0" }
 

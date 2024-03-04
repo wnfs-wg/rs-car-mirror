@@ -1,4 +1,5 @@
 use reqwest::Response;
+use std::{collections::TryReserveError, convert::Infallible};
 
 /// Possible errors raised in this library
 #[derive(thiserror::Error, Debug)]
@@ -29,4 +30,12 @@ pub enum Error {
     /// car-mirror errors
     #[error(transparent)]
     CarMirrorError(#[from] car_mirror::Error),
+
+    /// dag-cbor decoding errors
+    #[error(transparent)]
+    DagCborDecodeError(#[from] serde_ipld_dagcbor::DecodeError<Infallible>),
+
+    /// dag-cbor encoding errors
+    #[error(transparent)]
+    DagCborEncodeError(#[from] serde_ipld_dagcbor::EncodeError<TryReserveError>),
 }

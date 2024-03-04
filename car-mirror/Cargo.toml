@@ -21,6 +21,7 @@ doctest = true
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 bytes = { workspace = true }
+data-encoding = "2.5.0"
 deterministic-bloom = "0.1"
 futures = { workspace = true }
 iroh-car = "0.4"
@@ -30,6 +31,7 @@ proptest = { version = "1.1", optional = true }
 quick_cache = { version = "0.4", optional = true }
 roaring-graphs = { version = "0.12", optional = true }
 serde = "^1"
+serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 thiserror = "1.0"
 tokio = { version = "^1", default-features = false }
@@ -42,6 +44,7 @@ async-std = { version = "1.11", features = ["attributes"] }
 car-mirror = { path = ".", features = ["quick_cache", "test_utils"] }
 proptest = "1.1"
 roaring-graphs = "0.12"
+serde_json = { workspace = true }
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 test-strategy = "0.3"
 testresult = "0.3"

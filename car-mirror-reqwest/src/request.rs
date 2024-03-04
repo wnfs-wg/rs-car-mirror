@@ -1,9 +1,10 @@
 use crate::Error;
 use anyhow::Result;
-use car_mirror::{cache::Cache, common::Config, messages::PullRequest};
+use car_mirror::{cache::Cache, common::Config, messages::PushResponse};
 use futures::{Future, TryStreamExt};
 use libipld::Cid;
 use reqwest::{Body, Response, StatusCode};
+use std::{collections::TryReserveError, convert::Infallible};
 use tokio_util::io::StreamReader;
 use wnfs_common::BlockStore;
 
@@ -71,14 +72,8 @@ impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
         store: &(impl BlockStore + Clone + 'static),
         cache: &(impl Cache + Clone + 'static),
     ) -> Result<(), Error> {
-        push_with(root, store, cache, |body| async {
-            Ok::<_, Error>(
-                self.try_clone()
-                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
-                    .body(body)
-                    .send()
-                    .await?,
-            )
+        push_with(root, store, cache, |body| {
+            send_middleware_reqwest(self, body)
         })
         .await
     }
@@ -90,17 +85,24 @@ impl RequestBuilderExt for reqwest_middleware::RequestBuilder {
         store: &impl BlockStore,
         cache: &impl Cache,
     ) -> Result<(), Error> {
-        pull_with(root, config, store, cache, |pull_request| async move {
-            Ok::<_, Error>(
-                self.try_clone()
-                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
-                    .json(&pull_request)
-                    .send()
-                    .await?,
-            )
+        pull_with(root, config, store, cache, |body| {
+            send_middleware_reqwest(self, body)
         })
         .await
     }
+}
+
+async fn send_middleware_reqwest(
+    builder: &reqwest_middleware::RequestBuilder,
+    body: reqwest::Body,
+) -> Result<Response, Error> {
+    Ok(builder
+        .try_clone()
+        .ok_or(Error::RequestBuilderBodyAlreadySet)?
+        .header("Content-Type", "application/vnd.ipld.dag-cbor")
+        .body(body)
+        .send()
+        .await?)
 }
 
 impl RequestBuilderExt for reqwest::RequestBuilder {
@@ -110,16 +112,7 @@ impl RequestBuilderExt for reqwest::RequestBuilder {
         store: &(impl BlockStore + Clone + 'static),
         cache: &(impl Cache + Clone + 'static),
     ) -> Result<(), Error> {
-        push_with(root, store, cache, |body| async {
-            Ok::<_, Error>(
-                self.try_clone()
-                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
-                    .body(body)
-                    .send()
-                    .await?,
-            )
-        })
-        .await
+        push_with(root, store, cache, |body| send_reqwest(self, body)).await
     }
 
     async fn run_car_mirror_pull(
@@ -129,17 +122,21 @@ impl RequestBuilderExt for reqwest::RequestBuilder {
         store: &impl BlockStore,
         cache: &impl Cache,
     ) -> Result<(), Error> {
-        pull_with(root, config, store, cache, |pull_request| async move {
-            Ok::<_, Error>(
-                self.try_clone()
-                    .ok_or(Error::RequestBuilderBodyAlreadySet)?
-                    .json(&pull_request)
-                    .send()
-                    .await?,
-            )
-        })
-        .await
+        pull_with(root, config, store, cache, |body| send_reqwest(self, body)).await
     }
+}
+
+async fn send_reqwest(
+    builder: &reqwest::RequestBuilder,
+    body: reqwest::Body,
+) -> Result<Response, Error> {
+    Ok(builder
+        .try_clone()
+        .ok_or(Error::RequestBuilderBodyAlreadySet)?
+        .header("Content-Type", "application/vnd.ipld.dag-cbor")
+        .body(body)
+        .send()
+        .await?)
 }
 
 /// Run (possibly multiple rounds of) the car mirror push protocol.
@@ -160,6 +157,7 @@ where
     E: From<Error>,
     E: From<car_mirror::Error>,
     E: From<reqwest::Error>,
+    E: From<serde_ipld_dagcbor::DecodeError<Infallible>>,
 {
     let mut push_state = None;
 
@@ -184,7 +182,11 @@ where
             }
         }
 
-        push_state = Some(response.json().await?);
+        let response_bytes = response.bytes().await?;
+
+        let push_response = PushResponse::from_dag_cbor(&response_bytes)?;
+
+        push_state = Some(push_response);
     }
 }
 
@@ -194,6 +196,9 @@ where
 ///
 /// Unlike `run_car_mirror_pull`, this allows customizing the
 /// request every time it gets built, e.g. to refresh authentication tokens.
+///
+/// **Important:** Don't forget to set the `Content-Type` header to
+/// `application/vnd.ipld.dag-cbor` on your requests.
 pub async fn pull_with<F, Fut, E>(
     root: Cid,
     config: &Config,
@@ -202,15 +207,18 @@ pub async fn pull_with<F, Fut, E>(
     mut make_request: F,
 ) -> Result<(), E>
 where
-    F: FnMut(PullRequest) -> Fut,
+    F: FnMut(reqwest::Body) -> Fut,
     Fut: Future<Output = Result<Response, E>>,
     E: From<car_mirror::Error>,
     E: From<reqwest::Error>,
+    E: From<serde_ipld_dagcbor::EncodeError<TryReserveError>>,
 {
     let mut pull_request = car_mirror::pull::request(root, None, config, store, cache).await?;
 
     while !pull_request.indicates_finished() {
-        let answer = make_request(pull_request).await?.error_for_status()?;
+        let answer = make_request(pull_request.to_dag_cbor()?.into())
+            .await?
+            .error_for_status()?;
 
         let stream = StreamReader::new(answer.bytes_stream().map_err(std::io::Error::other));
 
