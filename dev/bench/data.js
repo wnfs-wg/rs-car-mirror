@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1709571186371,
+  "lastUpdate": 1709582644334,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -833,6 +833,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 848959111,
             "range": "± 4723757",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "98db580ce8a155d8b20d20f728f22611b72feb36",
+          "message": "chore: Remove unused dependencies & files (#45)\n\n* chore: Remove unused dependencies & files\r\n\r\n* chore: Improve package.json\r\n\r\n* fix: Put anyhow back in\r\n\r\n* fix: Put bytes dependency back in",
+          "timestamp": "2024-03-04T21:01:36+01:00",
+          "tree_id": "a43f8b8bbbf7a402e575c910a6e1e772c7cd1028",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/98db580ce8a155d8b20d20f728f22611b72feb36"
+        },
+        "date": 1709582643421,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22848161,
+            "range": "± 544418",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22610961,
+            "range": "± 530253",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 4973882,
+            "range": "± 150139",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 4858680,
+            "range": "± 115435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443890938,
+            "range": "± 2098187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464673565,
+            "range": "± 2110153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781310623,
+            "range": "± 5642983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 849155428,
+            "range": "± 4777095",
             "unit": "ns/iter"
           }
         ]
