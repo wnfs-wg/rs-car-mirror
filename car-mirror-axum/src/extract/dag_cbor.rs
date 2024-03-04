@@ -1,4 +1,4 @@
-//! Axum extractor for DagCbor
+//! Axum extractor that serializes and deserializes DagCbor data using serde
 
 use anyhow::Result;
 use axum::{
@@ -14,30 +14,32 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_ipld_dagcbor::DecodeError;
 use std::{convert::Infallible, fmt::Debug};
 
-/// TODO(matheus23): docs
+/// Newtype wrapper around dag-cbor (de-)serializable data
 #[derive(Debug, Clone)]
 pub struct DagCbor<M>(pub M);
 
-/// TODO(matheus23): docs
+/// Errors that can occur during dag-cbor deserialization
 #[derive(Debug, thiserror::Error)]
 pub enum DagCborRejection {
-    /// TODO(matheus23): docs
-    #[error("Missing Content-Type header on request, expected application/json or application/vnd.ipld.dag-cbor, but got nothing")]
+    /// When the Content-Type header is missing
+    #[error("Missing Content-Type header on request, expected application/vnd.ipld.dag-cbor, but got nothing")]
     MissingContentType,
 
-    /// TODO(matheus23): docs
+    /// When a Content-Type header was set, but unexpected.
     #[error("Incorrect mime type, expected application/vnd.ipld.dag-cbor, but got {0}")]
     UnexpectedContentType(mime::Mime),
 
-    /// TODO(matheus23): docs
-    #[error("Failed parsing Content-Type header as mime type, expected application/json or application/vnd.ipld.dag-cbor")]
+    /// When the Content-Type header was set, but couldn't be parsed as a mime type
+    #[error(
+        "Failed parsing Content-Type header as mime type, expected application/vnd.ipld.dag-cbor"
+    )]
     FailedToParseMime,
 
-    /// TODO(matheus23): docs
+    /// When the request body couldn't be loaded before deserialization
     #[error("Unable to buffer the request body, perhaps it exceeded the 2MB limit")]
     FailedParsingRequestBytes,
 
-    /// TODO(matheus23): docs
+    /// When dag-cbor deserialization into the target type fails
     #[error("Failed decoding dag-cbor: {0}")]
     FailedDecoding(#[from] DecodeError<Infallible>),
 }

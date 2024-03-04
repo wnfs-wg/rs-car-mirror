@@ -22,16 +22,32 @@ use tower_http::{
 };
 use wnfs_common::BlockStore;
 
-/// TODO(matheus23): docs
+/// Serve a basic car mirror server that serves the routes from `app`
+/// with given blockstore at `127.0.0.1:3344`.
+///
+/// When the server is ready to accept connections, it will print a
+/// message to the console: "Listening on 127.0.0.1.3344".
+///
+/// This is a simple function mostly useful for tests. If you want to
+/// customize its function, copy its source and create a modified copy
+/// as needed.
+///
+/// This is not intended for production usage, for multiple reasons:
+/// - There is no rate-limiting on the requests, so such a service would
+///   be susceptible to DoS attacks.
+/// - The `push` route should usually only be available behind
+///   authorization or perhaps be heavily rate-limited, otherwise it
+///   can cause unbounded memory or disk growth remotely.
 pub async fn serve(store: impl BlockStore + Clone + 'static) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3344").await?;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3344").await?;
     let addr = listener.local_addr()?;
     println!("Listening on {addr}");
     axum::serve(listener, app(store)).await?;
     Ok(())
 }
 
-/// TODO(matheus23): docs
+/// This will serve the routes from `dag_router` nested under `/dag`, but with
+/// tracing and cors headers.
 pub fn app(store: impl BlockStore + Clone + 'static) -> Router {
     let cors = CorsLayer::new()
         .allow_methods(Any)
@@ -47,7 +63,13 @@ pub fn app(store: impl BlockStore + Clone + 'static) -> Router {
         .fallback(not_found)
 }
 
-/// TODO(matheus23): docs
+/// Returns a router for car mirror requests with the
+/// given blockstore as well as a new 10MB cache as state.
+///
+/// This serves following routes:
+/// - `GET /pull/:cid` for pull requests (GET is generally not recommended here)
+/// - `POST /pull/:cid` for pull requests
+/// - `POST /push/:cid` for push requests
 pub fn dag_router(store: impl BlockStore + Clone + 'static) -> Router {
     Router::new()
         .route("/pull/:cid", get(car_mirror_pull))
@@ -56,7 +78,9 @@ pub fn dag_router(store: impl BlockStore + Clone + 'static) -> Router {
         .with_state(ServerState::new(store))
 }
 
-/// TODO(matheus23): docs
+/// The server state used for a basic car mirror server.
+///
+/// Stores a block store and a car mirror operations cache.
 #[derive(Debug, Clone)]
 pub struct ServerState<B: BlockStore + Clone + 'static> {
     store: B,
@@ -64,7 +88,8 @@ pub struct ServerState<B: BlockStore + Clone + 'static> {
 }
 
 impl<B: BlockStore + Clone + 'static> ServerState<B> {
-    /// TODO(matheus23): docs
+    /// Initialize the server state with given blockstore and
+    /// a roughly 10MB car mirror operations cache.
     pub fn new(store: B) -> ServerState<B> {
         Self {
             store,
@@ -73,7 +98,9 @@ impl<B: BlockStore + Clone + 'static> ServerState<B> {
     }
 }
 
-/// TODO(matheus23): docs
+/// Handle a POST request for car mirror pushes.
+///
+/// This will consume the incoming body as a car file stream.
 #[tracing::instrument(skip(state), err, ret)]
 pub async fn car_mirror_push<B: BlockStore + Clone + 'static>(
     State(state): State<ServerState<B>>,
@@ -119,7 +146,9 @@ where {
     }
 }
 
-/// TODO(matheus23): docs
+/// Handle an incoming GET or POST request for a car mirror pull.
+///
+/// The response body will contain a stream of car file chunks.
 #[tracing::instrument(skip(state), err, ret)]
 pub async fn car_mirror_pull<B: BlockStore + Clone + 'static>(
     State(state): State<ServerState<B>>,
@@ -147,7 +176,6 @@ pub async fn car_mirror_pull<B: BlockStore + Clone + 'static>(
     Ok((StatusCode::OK, Body::from_stream(car_chunks)))
 }
 
-/// TODO(matheus23): docs
 #[axum_macros::debug_handler]
 async fn not_found() -> (StatusCode, &'static str) {
     tracing::info!("Hit 404");
