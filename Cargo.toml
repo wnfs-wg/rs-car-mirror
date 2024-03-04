@@ -5,7 +5,6 @@ members = [
 	"car-mirror-benches",
 	"car-mirror-reqwest",
 	"car-mirror-wasm",
-	"examples",
 ]
 
 [workspace.dependencies]

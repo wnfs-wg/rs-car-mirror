@@ -1,6 +1,6 @@
 {
   "name": "car-mirror",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Wasm bindings to the rust implementation of the car mirror protocol",
   "main": "index.js",
   "type": "module",
