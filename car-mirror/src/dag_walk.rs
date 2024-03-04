@@ -270,12 +270,12 @@ mod proptests {
     use futures::TryStreamExt;
     use libipld::{
         multihash::{Code, MultihashDigest},
-        Cid, Ipld, IpldCodec,
+        Ipld, IpldCodec,
     };
     use proptest::strategy::Strategy;
     use std::collections::BTreeSet;
     use test_strategy::proptest;
-    use wnfs_common::{encode, BlockStore, MemoryBlockStore};
+    use wnfs_common::{encode, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
         arb_ipld_dag(1..256, 0.5, |cids, _| {

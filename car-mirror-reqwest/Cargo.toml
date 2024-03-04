@@ -49,3 +49,7 @@ wnfs-unixfs-file = { workspace = true }
 all-features = true
 # defines the configuration attribute `docsrs`
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
