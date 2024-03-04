@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1708963882170,
+  "lastUpdate": 1709571186371,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -761,6 +761,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 848960522,
             "range": "± 4735424",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ca6f34a4a7796075b1b7e9657fe829347d3c1c2",
+          "message": "feat: Implement `car-mirror-wasm` and `car-mirror-axum` crates (#44)\n\n* feat: Succinctly encode `PullRequest` and `PushResponse`\r\n\r\n* feat: Write `car-mirror-axum` crate\r\n\r\n* refactor: Move car-mirror-reqwest integration test into doctest\r\n\r\n* fix: PullRequest/PushResponse dagcbor roundtripping\r\n\r\n* chore: Add necessary features\r\n\r\n* feat: Write car-mirror-wasm crate & playwright tests\r\n\r\n* feat: Serve both HTTP + HTTPS with self signed certs\r\n\r\n* refactor: Disable crate for non-wasm in a different way\r\n\r\n* feat: Auto-detect whether to use streaming or not\r\n\r\n* chore: Run tests for both HTTP and HTTPS\r\n\r\n* feat: Run playwright tests in github actions\r\n\r\n* fix: Don't require confirmation on cargo binstall command\r\n\r\n* fix: correct playwright action commands\r\n\r\n* fix: Cache JS deps & setup wasm32 target in action\r\n\r\n* chore: Try some stuf\r\n\r\n* chore: Fix lints\r\n\r\n* fix: Support webkit that doesn't have BYOBReader support\r\n\r\n* chore: fmt\r\n\r\n* fix: Reintroduce `car_mirror_axum::serve`\r\n\r\n* chore: Run reqwest axum integration with coverage\r\n\r\n* chore: Test more lines in `messages.rs`: `indicates_finished`\r\n\r\n* chore: Write `car-mirror-axum` documentation\r\n\r\n* fix: Pin version of wasm-bindgen in CI\r\n\r\n* feat: Switch to `playwright-test` as test runner\r\n\r\n* chore: Remove unused `example` crate + update wasm version",
+          "timestamp": "2024-03-04T17:50:20+01:00",
+          "tree_id": "ded4bc2e93b9d0053673eb164247f0e54f58a9b8",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/0ca6f34a4a7796075b1b7e9657fe829347d3c1c2"
+        },
+        "date": 1709571185731,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22655177,
+            "range": "± 610147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22306415,
+            "range": "± 455303",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 4850508,
+            "range": "± 346440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 4865116,
+            "range": "± 321717",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443757220,
+            "range": "± 2127497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464470045,
+            "range": "± 2147698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781194139,
+            "range": "± 5637281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 848959111,
+            "range": "± 4723757",
             "unit": "ns/iter"
           }
         ]
