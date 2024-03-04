@@ -2,7 +2,25 @@
   "name": "car-mirror",
   "version": "0.1.0",
   "description": "Wasm bindings to the rust implementation of the car mirror protocol",
-  "main": "index.js",
+  "keywords": [
+    "car-mirror",
+    "car",
+    "mirror",
+    "protocol",
+    "ipfs",
+    "ipld",
+    "transport"
+  ],
+  "author": "Philipp Krüger <philipp@fission.codes>",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/fission-codes/rs-car-mirror#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fission-codes/rs-car-mirror.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fission-codes/rs-car-mirror/issues"
+  },
   "type": "module",
   "module": "dist/bundler/car_mirror_wasm.js",
   "types": "dist/nodejs/car_mirror_wasm.d.ts",
@@ -25,16 +43,9 @@
   "directories": {
     "test": "tests"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fission-codes/rs-car-mirror.git"
-  },
-  "author": "Philipp Krüger <philipp@fission.codes>",
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/fission-codes/rs-car-mirror/issues"
-  },
-  "homepage": "https://github.com/fission-codes/rs-car-mirror#readme",
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@ipld/unixfs": "^3.0.0",
     "fetch-h2": "^3.0.2",
