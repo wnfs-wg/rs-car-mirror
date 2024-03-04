@@ -49,62 +49,19 @@ Description.
 
 ## Set-up
 
-We'll use [`wasm-pack`][wasm-pack] for building, testing, and publishing
-our Wasm project.
+TODO
 
 ### Build for Javascript
 
-The `wasm-pack build` command will compile the code in this directory into
-Wasm and generate a `pkg` folder by default, containing the Wasm binary, a
-Javascript-wrapper file, the car-mirror-wasm README (and version), and a
-`package.json` file.
-
-- Targetting node:
-
-  ```console
-  wasm-pack build --target nodejs
-  ```
-
-- Targetting browswers:
-
-  ```console
-  wasm-pack build --target web
-  ```
-
-- Targetting bundlers like [webpack][webpack]:
-
-  ```console
-  wasm-pack build --target bundler
-  ```
+TODO
 
 ## Testing the Project
 
-For running tests in the current directory, use one of these commands:
-
-- Run tests expected to execute in [Node.js][node-js]:
-
-```console
-wasm-pack test --node
-```
-
-- Run browser tests in a headless browwer:
-
-```console
-wasm-pack test --headless --firefox --chrome --safari
-```
-
-*Note*: Make sure you have the appropriate browser installed when running
-locally.
+TODO
 
 ## Publishing a Package
 
-Once you've [built the package](#build-for-javascript), which lives under
-`pkg` by default (or a sub-directory of your choosing), you can pack and
-publish it to [npm][npm] via (given credentials):
-
-```console
-wasm-pack publish
-```
+TODO
 
 ## License
 

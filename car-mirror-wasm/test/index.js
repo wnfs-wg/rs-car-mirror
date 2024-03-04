@@ -1,9 +1,7 @@
+import { setPanicHook, push_request, push_request_streaming, pull_request, pull_handle_response_streaming, PushResponse } from "../dist/bundler/car_mirror_wasm.js"
+import { CID } from "multiformats"
+import * as UnixFS from "@ipld/unixfs"
 
-import { setPanicHook, initSync, push_request, push_request_streaming, pull_request, pull_handle_response_streaming, PushResponse } from "/dist/web/car_mirror_wasm.js"
-import { CID } from "https://esm.sh/multiformats"
-import * as UnixFS from "https://esm.sh/@ipld/unixfs"
-
-initSync(await (await fetch("/dist/web/car_mirror_wasm_bg.wasm")).arrayBuffer());
 setPanicHook();
 
 const supportsRequestStreams = (() => {
@@ -85,11 +83,12 @@ export async function runCarMirrorPush(serverUrl, cidString, store) {
     let lastResponse = null;
     while (!lastResponse?.indicatesFinished()) {
         console.debug(`Creating push request body (supports streams? ${supportsRequestStreams} isHTTPS? ${isHTTPS})`)
+        /** @type {ReadableStream<Uint8Array> | Uint8Array} */
         const body = useStreaming
             ? await push_request_streaming(cid.bytes, lastResponse == null ? undefined : lastResponse, store)
             : await push_request(cid.bytes, lastResponse == null ? undefined : lastResponse, store);
 
-        console.debug("Initiating request", url.toString(), body);
+        console.debug("Initiating request", url.toString(), body.length ?? "(can't print length of stream)");
         const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -143,11 +142,3 @@ export async function exampleFile(store, writes) {
 
     return cid;
 }
-
-window.runCarMirrorPull = runCarMirrorPull;
-window.runCarMirrorPush = runCarMirrorPush;
-window.supportsRequestStreams = supportsRequestStreams;
-window.MemoryBlockStore = MemoryBlockStore;
-window.exampleFile = exampleFile;
-window.CID = CID;
-window.UnixFS = UnixFS;

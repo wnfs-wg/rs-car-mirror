@@ -4,6 +4,24 @@
   "description": "Wasm bindings to the rust implementation of the car mirror protocol",
   "main": "index.js",
   "type": "module",
+  "module": "dist/bundler/car_mirror_wasm.js",
+  "types": "dist/nodejs/car_mirror_wasm.d.ts",
+  "exports": {
+    ".": {
+      "browser": "./dist/bundler/car_mirror_wasm.js",
+      "node": "./dist/nodejs/car_mirror_wasm.cjs",
+      "default": "./dist/bundler/car_mirror_wasm.js",
+      "types": "./dist/nodejs/car_mirror_wasm.d.ts"
+    },
+    "./nodejs": {
+      "default": "./dist/nodejs/car_mirror_wasm.cjs",
+      "types": "./dist/nodejs/car_mirror_wasm.d.ts"
+    },
+    "./web": {
+      "default": "./dist/web/car_mirror_wasm.js",
+      "types": "./dist/web/car_mirror_wasm.d.ts"
+    }
+  },
   "directories": {
     "test": "tests"
   },
@@ -20,7 +38,8 @@
   "dependencies": {
     "@ipld/unixfs": "^3.0.0",
     "fetch-h2": "^3.0.2",
-    "multiformats": "^13.1.0"
+    "multiformats": "^13.1.0",
+    "playwright-test": "^14.1.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",
@@ -162,12 +181,18 @@
       }
     },
     "test": {
-      "command": "playwright test",
+      "command": "playwright-test 'test/**/*.spec.js'",
       "dependencies": [
-        "bindgen:web",
+        "bindgen:bundler",
         "http-server",
         "car-mirror-server"
       ]
+    }
+  },
+  "playwright-test": {
+    "browserContextOptions": {
+      "baseURL": "http://127.0.0.1:8081",
+      "ignoreHTTPSErrors": true
     }
   }
 }
