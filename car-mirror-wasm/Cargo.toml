@@ -20,7 +20,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
-car-mirror = { path = "../car-mirror" }
+car-mirror = { path = "../car-mirror", version = "0.1" }
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
