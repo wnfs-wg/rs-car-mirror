@@ -93,7 +93,21 @@ mod test {
     use wnfs_common::MemoryBlockStore;
     use wnfs_unixfs_file::builder::FileBuilder;
 
-    async fn example_receiver_state() -> Result<ReceiverState> {
+    async fn loaded_receiver_state() -> Result<ReceiverState> {
+        let store = &MemoryBlockStore::new();
+
+        let root_cid = FileBuilder::new()
+            .content_bytes(vec![42; 500_000])
+            .build()?
+            .store(store)
+            .await?;
+
+        let dag = IncrementalDagVerification::new([root_cid], store, &NoCache).await?;
+
+        Ok(dag.into_receiver_state(Config::default().bloom_fpr))
+    }
+
+    async fn partial_receiver_state() -> Result<ReceiverState> {
         let store = &MemoryBlockStore::new();
         let store2 = &MemoryBlockStore::new();
 
@@ -118,7 +132,7 @@ mod test {
 
     #[test_log::test(async_std::test)]
     async fn test_encoding_format_json_concise() -> TestResult {
-        let receiver_state = example_receiver_state().await?;
+        let receiver_state = partial_receiver_state().await?;
         let pull_request: PullRequest = receiver_state.clone().into();
         let push_response: PushResponse = receiver_state.into();
 
@@ -132,7 +146,7 @@ mod test {
 
     #[test_log::test(async_std::test)]
     async fn test_dag_cbor_roundtrip() -> TestResult {
-        let receiver_state = example_receiver_state().await?;
+        let receiver_state = partial_receiver_state().await?;
         let pull_request: PullRequest = receiver_state.clone().into();
         let push_response: PushResponse = receiver_state.into();
 
@@ -142,6 +156,34 @@ mod test {
         assert_eq!(pull_request, pull_back);
         assert_eq!(push_response, push_back);
 
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_pull_request_have_everything_indicates_finished() -> TestResult {
+        let pull_request: PullRequest = loaded_receiver_state().await?.into();
+        assert!(pull_request.indicates_finished());
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_push_response_have_everything_indicates_finished() -> TestResult {
+        let push_response: PushResponse = loaded_receiver_state().await?.into();
+        assert!(push_response.indicates_finished());
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_pull_request_partial_indicates_not_finished() -> TestResult {
+        let pull_request: PullRequest = partial_receiver_state().await?.into();
+        assert!(!pull_request.indicates_finished());
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_push_response_partial_indicates_not_finished() -> TestResult {
+        let push_response: PushResponse = partial_receiver_state().await?.into();
+        assert!(!push_response.indicates_finished());
         Ok(())
     }
 }
