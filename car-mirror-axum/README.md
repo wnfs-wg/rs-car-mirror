@@ -30,7 +30,7 @@
 
 ## car-mirror-axum
 
-Description.
+This crate strives to be an `axum` (version `0.7`) integration of `car-mirror` to serve data over HTTP via the car-mirror protocol.
 
 ## License
 

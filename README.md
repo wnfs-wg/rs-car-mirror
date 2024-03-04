@@ -35,7 +35,14 @@
 
 <div align="center"><sub>:warning: Work in progress :warning:</sub></div>
 
-##
+## rs-car-mirror
+
+A rust implementation of the [car mirror protocol] that can be compiled to Wasm to run in the browser.
+Car mirror is used to transfer [IPLD] from one computer to another over the internet over various transports,
+but most notably HTTP(s).
+It tries to do so with deduplication and minimal communcation round-trips.
+
+The main storage abstraction that rs-car-mirror is built upon is a [`BlockStore`] implementation from the [`wnfs-common` crate].
 
 ## Outline
 
@@ -51,42 +58,96 @@
 
 ## Crates
 
-- [car-mirror](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror)
-- [car-mirror-wasm](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-wasm)
+- [car-mirror](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror): The [sans-io] implementation of the car mirror protocol
+- [car-mirror-axum](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-axum): Utilities for and an implementation of a car mirror HTTP server.
+- [car-mirror-reqwest](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-reqwest): Utilities for running car mirror protocol requests against a car mirror HTTP server.
+- [car-mirror-wasm](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-wasm): (Browser-flavoured) Wasm bindings to the client parts of car-mirror.
+- [car-mirror-benches](https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-benches): Benchmarks. Not a published crate.
+
+This is the dependency graph between these crates:
+```mermaid
+flowchart TD
+  car-mirror-wasm --> car-mirror
+  car-mirror-reqwest --> car-mirror
+  car-mirror-axum --> car-mirror
+  car-mirror-benches --> car-mirror
+```
 
 ## Usage and Installation
 
-### Using `cargo`
+### Usage
 
-This is just for the rust-only `car-mirror` binary application:
+This is an example of running both a local car-mirror axum server with some test data as well as running requests against it using car-mirror-reqwest:
 
-```console
-cargo install car-mirror
+```rs
+use anyhow::Result;
+use car_mirror::{cache::NoCache, common::Config};
+use car_mirror_reqwest::RequestBuilderExt;
+use reqwest::Client;
+use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_RAW};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Start a car-mirror axum webserver:
+    tokio::spawn(car_mirror_axum::serve(MemoryBlockStore::new()));
+
+    // Generate some test IPLD data:
+    let store = MemoryBlockStore::new();
+    let data = b"Hello, world!".to_vec();
+    let root = store.put_block(data, CODEC_RAW).await?;
+
+    // Run the car mirror push protocol to upload the IPLD data:
+    let client = Client::new();
+    client
+        .post(format!("http://localhost:3344/dag/push/{root}"))
+        .run_car_mirror_push(root, &store, &NoCache)
+        .await?;
+
+    let store = MemoryBlockStore::new(); // clear out data
+    // Download the same data again:
+    client
+        .post(format!("http://localhost:3344/dag/pull/{root}"))
+        .run_car_mirror_pull(root, &Config::default(), &store, &NoCache)
+        .await?;
+
+    assert!(store.has_block(&root).await?);
+    Ok(())
+}
 ```
 
-### car-mirror-wasm Usage
+### In a rust project
 
-Due to the reliance on [wasm-pack][wasm-pack], `car-mirror-wasm` is only
-available as a library.
+- `cargo add car-mirror-reqwest` if you want to do client requests with the `reqwest` crate against a car-mirror server over HTTP.
+- `cargo add car-mirror-axum` if you want to implement an `axum` version `0.7` server to serve data via car-mirror over HTTP.
+- `cargo add car-mirror` as a lower-level library for clients/servers/peers that want to talk car-mirror over other protocol types.
 
-- Add the following to the `[dependencies]` section of your `Cargo.toml` file
-  for using `car-mirror-wasm` crate/workspace:
+### In a javascript project
 
-```toml
-car-mirror-wasm = "0.1.0"
-```
+`npm i car-mirror-wasm`
+
+This monorepo contains the `car-mirror-wasm` bindings to the client parts of `car-mirror`.
+These bindings are really low-level and only have rudimentary typescript types.
+Take a look at the [test utilities](https://github.com/fission-codes/rs-car-mirror/blob/98db580ce8a155d8b20d20f728f22611b72feb36/car-mirror-wasm/test/index.js) to see how to use the low-level functions together with e.g. the `fetch` API.
 
 ## Testing the Project
 
-- Run tests for crate/workspace `car-mirror`:
+- Run tests for the whole workspace:
 
   ```console
-  cd car-mirror && cargo test
+  cargo test
   ```
 
-- To run tests for crate/workspace `car-mirror-wasm`, follow
-  the instructions in [car-mirror-wasm](./car-mirror-wasm#testing-the-project),
-  which leverages [wasm-pack][wasm-pack].
+  Or just the `car-mirror` crate:
+
+  ```console
+  cargo test -p car-mirror
+  ```
+
+- To test `car-mirror-wasm`:
+
+  ```console
+  cd car-mirror-wasm && npm test
+  ```
 
 ## Benchmarking the Project
 
@@ -108,15 +169,6 @@ However, with some extra work, benchmarks can be compiled to [wasi][wasi] and
 run with [wasmer][wasmer]/[wasmtime][wasmtime] or in the brower with
 [webassembly.sh][wasmsh]. Please catch-up with wasm support for criterion on their
 [user-guide][criterion-user-guide].
-
-## Setting-up car-mirror-wasm
-
-The Wasm targetted version of this project relies on [wasm-pack][wasm-pack]
-for building, testing, and publishing artifacts sutiable for
-[Node.js][node-js], web broswers, or bundlers like [webpack][webpack].
-
-Please read more on working with `wasm-pack` directly in
-[car-mirror-wasm](./car-mirror-wasm#set-up).
 
 ## Contributing
 
@@ -150,9 +202,9 @@ hooks. Please run this before every commit and/or push.
 
 ### Recommended Development Flow
 
-- We recommend leveraging [cargo-watch][cargo-watch],
-  [cargo-expand][cargo-expand] and [irust][irust] for Rust development.
-- We recommend using [cargo-udeps][cargo-udeps] for removing unused dependencies
+- We recommend leveraging [cargo-watch],
+  [cargo-expand] and [irust] for Rust development.
+- We recommend using [cargo-udeps] for removing unused dependencies
   before commits and pull-requests.
 
 ### Conventional Commits
@@ -212,7 +264,6 @@ conditions.
 [mit]: http://opensource.org/licenses/MIT
 [nix]:https://nixos.org/download.html
 [nix-flake]: https://nixos.wiki/wiki/Flakes
-[node-js]: https://nodejs.dev/en/
 [pre-commit]: https://pre-commit.com/
 [proptest]: https://github.com/proptest-rs/proptest
 [strategies]: https://docs.rs/proptest/latest/proptest/strategy/trait.Strategy.html
@@ -220,5 +271,9 @@ conditions.
 [wasmer]: https://wasmer.io/
 [wasmtime]: https://docs.wasmtime.dev/
 [wasmsh]: https://webassembly.sh/
-[wasm-pack]: https://rustwasm.github.io/docs/wasm-pack/
-[webpack]: https://webpack.js.org/
+[wasm-bindgen]: https://github.com/rustwasm/wasm-bindgen
+[car mirror protocol]: https://github.com/wnfs-wg/car-mirror-spec
+[IPLD]: https://ipld.io
+[sans-io]: https://release-plz.ieni.dev/docs/usage/installation
+[`BlockStore`]: https://docs.rs/wnfs-common/latest/wnfs_common/blockstore/trait.BlockStore.html
+[`wnfs-common` crate]: https://docs.rs/wnfs-common/latest/wnfs_common/

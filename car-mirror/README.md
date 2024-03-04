@@ -32,9 +32,16 @@
 
 <div align="center"><sub>:warning: Work in progress :warning:</sub></div>
 
-##
+## car-mirror
 
-Description.
+This is a [sans-io] implementation of the [car mirror protocol].
+Car mirror is used to transfer [IPLD] from one computer to another over the internet over various transports,
+but most notably HTTP(s).
+It tries to do so with deduplication and minimal communcation round-trips.
+
+The main storage abstraction that this crate uses is a [`BlockStore`] implementation from the [`wnfs-common` crate].
+
+If you're looking for higher-level APIs, please take a look at `car-mirror-reqwest` for clients or `car-mirror-axum` for servers.
 
 ## License
 
@@ -55,3 +62,8 @@ conditions.
 
 [apache]: https://www.apache.org/licenses/LICENSE-2.0
 [mit]: http://opensource.org/licenses/MIT
+[car mirror protocol]: https://github.com/wnfs-wg/car-mirror-spec
+[IPLD]: https://ipld.io
+[sans-io]: https://release-plz.ieni.dev/docs/usage/installation
+[`BlockStore`]: https://docs.rs/wnfs-common/latest/wnfs_common/blockstore/trait.BlockStore.html
+[`wnfs-common` crate]: https://docs.rs/wnfs-common/latest/wnfs_common/

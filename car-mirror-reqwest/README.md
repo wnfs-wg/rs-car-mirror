@@ -30,7 +30,7 @@
 
 ## car-mirror-reqwest
 
-Description.
+`reqwest` integration of `car-mirror` to do client car-mirror requests for data upload or download over HTTP.
 
 ## License
 

@@ -35,9 +35,9 @@
 
 <div align="center"><sub>:warning: Work in progress :warning:</sub></div>
 
-##
+## car-mirror-wasm
 
-Description.
+Low-level bindings to the client parts of the `car-mirror` rust crate.
 
 ## Outline
 
