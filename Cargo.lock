@@ -685,6 +685,7 @@ name = "car-mirror-wasm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "car-mirror",
  "console_error_panic_hook",
  "futures",

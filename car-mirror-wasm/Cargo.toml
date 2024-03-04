@@ -19,6 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+bytes = { workspace = true }
 car-mirror = { path = "../car-mirror" }
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
