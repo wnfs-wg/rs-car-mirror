@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1709587124942,
+  "lastUpdate": 1709835425334,
   "repoUrl": "https://github.com/fission-codes/rs-car-mirror",
   "entries": {
     "Rust Benchmark": [
@@ -1049,6 +1049,78 @@ window.BENCHMARK_DATA = {
             "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
             "value": 848922717,
             "range": "± 4697664",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "committer": {
+            "email": "philipp.krueger1@gmail.com",
+            "name": "Philipp Krüger",
+            "username": "matheus23"
+          },
+          "distinct": true,
+          "id": "2d9d5f83e97a0bb6d845337861a6884606953f77",
+          "message": "fix: Correct link for  in readme",
+          "timestamp": "2024-03-07T19:14:36+01:00",
+          "tree_id": "c735259b35bf849f6d0db02bc0046fbb6bddf904",
+          "url": "https://github.com/fission-codes/rs-car-mirror/commit/2d9d5f83e97a0bb6d845337861a6884606953f77"
+        },
+        "date": 1709835424916,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "push cold, get_block throttled",
+            "value": 22580423,
+            "range": "± 527598",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold, get_block throttled",
+            "value": 22778872,
+            "range": "± 527504",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push cold",
+            "value": 5095488,
+            "range": "± 156024",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull cold",
+            "value": 5069209,
+            "range": "± 105371",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 443973301,
+            "range": "± 2111698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "pull with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 464875981,
+            "range": "± 2138921",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 10240 byte blocks, ~60..64 blocks",
+            "value": 781324817,
+            "range": "± 5670632",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "push with simulated latency, 1024 byte blocks, ~600..640 blocks",
+            "value": 849334951,
+            "range": "± 4693627",
             "unit": "ns/iter"
           }
         ]
