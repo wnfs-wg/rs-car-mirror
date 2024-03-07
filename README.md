@@ -274,6 +274,6 @@ conditions.
 [wasm-bindgen]: https://github.com/rustwasm/wasm-bindgen
 [car mirror protocol]: https://github.com/wnfs-wg/car-mirror-spec
 [IPLD]: https://ipld.io
-[sans-io]: https://release-plz.ieni.dev/docs/usage/installation
+[sans-io]: https://sans-io.readthedocs.io/
 [`BlockStore`]: https://docs.rs/wnfs-common/latest/wnfs_common/blockstore/trait.BlockStore.html
 [`wnfs-common` crate]: https://docs.rs/wnfs-common/latest/wnfs_common/
