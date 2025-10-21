@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serializer, ser::SerializeSeq};
 use wnfs_common::Cid;
 
 pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Cid>, D::Error>

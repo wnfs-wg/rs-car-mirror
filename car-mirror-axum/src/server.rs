@@ -1,11 +1,11 @@
-use crate::{extract::dag_cbor::DagCbor, AppResult};
+use crate::{AppResult, extract::dag_cbor::DagCbor};
 use anyhow::Result;
 use axum::{
+    Router,
     body::{Body, HttpBody},
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
-    Router,
 };
 use car_mirror::{
     cache::InMemoryCache,
@@ -114,9 +114,7 @@ where {
 
     tracing::info!(content_length, "Parsed content length hint");
 
-    let mut reader = StreamReader::new(
-        body_stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
-    );
+    let mut reader = StreamReader::new(body_stream.map_err(std::io::Error::other));
 
     let response = car_mirror::push::response_streaming(
         cid,

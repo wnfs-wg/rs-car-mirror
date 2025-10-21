@@ -1,4 +1,4 @@
-use serde::{de::Visitor, Deserializer, Serializer};
+use serde::{Deserializer, Serializer, de::Visitor};
 
 pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
 where

@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::utils::handle_err;
 use js_sys::Error;
-use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
+use wasm_bindgen::{JsValue, prelude::wasm_bindgen};
 
 /// Bindings to the `PullRequest` message type from car mirror
 #[wasm_bindgen]

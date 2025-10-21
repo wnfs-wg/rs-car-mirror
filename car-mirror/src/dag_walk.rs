@@ -1,6 +1,6 @@
 use crate::{cache::Cache, common::references, error::Error};
 use bytes::Bytes;
-use futures::{stream::try_unfold, Stream};
+use futures::{Stream, stream::try_unfold};
 use std::collections::{HashSet, VecDeque};
 use wnfs_common::{BlockStore, BlockStoreError, Cid};
 
@@ -198,7 +198,7 @@ mod tests {
     use futures::TryStreamExt;
     use ipld_core::ipld::Ipld;
     use testresult::TestResult;
-    use wnfs_common::{MemoryBlockStore, CODEC_DAG_CBOR};
+    use wnfs_common::{CODEC_DAG_CBOR, MemoryBlockStore};
 
     #[test_log::test(async_std::test)]
     async fn test_walk_dag_breadth_first() -> TestResult {
@@ -271,7 +271,7 @@ mod proptests {
     use proptest::strategy::Strategy;
     use std::collections::BTreeSet;
     use test_strategy::proptest;
-    use wnfs_common::{MemoryBlockStore, CODEC_DAG_CBOR};
+    use wnfs_common::{CODEC_DAG_CBOR, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
         arb_ipld_dag(1..256, 0.5, |cids, _| links_to_ipld(cids))

@@ -6,7 +6,9 @@ use wnfs_common::{BlockStoreError, Cid};
 pub enum Error {
     /// An error raised during receival of blocks, when more than the configured maximum
     /// bytes are received in a single batch. See the `Config` type.
-    #[error("Expected to receive no more than {receive_maximum} bytes, but got at least {bytes_read}, aborting request.")]
+    #[error(
+        "Expected to receive no more than {receive_maximum} bytes, but got at least {bytes_read}, aborting request."
+    )]
     TooManyBytes {
         /// The configured amount of maximum bytes to receive
         receive_maximum: usize,
@@ -15,7 +17,9 @@ pub enum Error {
     },
 
     /// An error raised when an individual block exceeded the maximum configured block size
-    #[error("Maximum block size exceeded, maximum configured block size is {max_block_size} bytes, but got {block_bytes} at {cid}")]
+    #[error(
+        "Maximum block size exceeded, maximum configured block size is {max_block_size} bytes, but got {block_bytes} at {cid}"
+    )]
     BlockSizeExceeded {
         /// The CID of the block that exceeded the maximum
         cid: Cid,

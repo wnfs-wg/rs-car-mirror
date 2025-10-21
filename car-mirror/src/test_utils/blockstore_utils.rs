@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ipld_core::ipld::Ipld;
 use std::io::Write;
-use wnfs_common::{BlockStore, Cid, MemoryBlockStore, CODEC_DAG_CBOR, CODEC_DAG_JSON, CODEC_RAW};
+use wnfs_common::{BlockStore, CODEC_DAG_CBOR, CODEC_DAG_JSON, CODEC_RAW, Cid, MemoryBlockStore};
 
 /// Take a list of dag-cbor IPLD blocks and store all of them as dag-cbor in a
 /// MemoryBlockStore & return it.

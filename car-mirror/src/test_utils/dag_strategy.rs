@@ -5,13 +5,13 @@ use proptest::{
     strategy::Strategy,
     test_runner::TestRng,
 };
-use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
+use roaring_graphs::{DirectedAcyclicGraph, Vertex, arb_dag};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     ops::Range,
 };
-use wnfs_common::{Cid, CODEC_DAG_CBOR, CODEC_RAW, MULTIHASH_BLAKE3};
+use wnfs_common::{CODEC_DAG_CBOR, CODEC_RAW, Cid, MULTIHASH_BLAKE3};
 
 /// A strategy for use with proptest to generate random DAGs (directed acyclic graphs).
 /// The strategy generates a list of blocks of type T and their CIDs, as well as

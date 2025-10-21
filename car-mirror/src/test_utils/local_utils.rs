@@ -1,11 +1,11 @@
 ///! Crate-local test utilities
-use super::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore, Rvg};
+use super::{Rvg, arb_ipld_dag, links_to_padded_ipld, setup_blockstore};
 use crate::{cache::NoCache, common::references, dag_walk::DagWalk, error::Error};
 use anyhow::Result;
 use futures::TryStreamExt;
 use ipld_core::ipld::Ipld;
 use proptest::strategy::Strategy;
-use wnfs_common::{utils::CondSend, BlockStore, Cid, MemoryBlockStore};
+use wnfs_common::{BlockStore, Cid, MemoryBlockStore, utils::CondSend};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Metrics {

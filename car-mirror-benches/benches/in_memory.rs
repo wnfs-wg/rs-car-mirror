@@ -4,7 +4,7 @@ use car_mirror::{
     pull, push,
     test_utils::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore},
 };
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use wnfs_common::MemoryBlockStore;
 
 pub fn push(c: &mut Criterion) {

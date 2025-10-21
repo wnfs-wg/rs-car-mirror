@@ -12,8 +12,8 @@ use ipld_core::ipld::Ipld;
 use iroh_car::{CarHeader, CarReader, CarWriter};
 use std::io::Cursor;
 use wnfs_common::{
-    utils::{boxed_stream, BoxStream, CondSend},
-    BlockStore, Cid, CODEC_DAG_CBOR, CODEC_DAG_PB, CODEC_RAW,
+    BlockStore, CODEC_DAG_CBOR, CODEC_DAG_PB, CODEC_RAW, Cid,
+    utils::{BoxStream, CondSend, boxed_stream},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -626,7 +626,7 @@ pub(crate) mod tests {
     use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
     use assert_matches::assert_matches;
     use testresult::TestResult;
-    use wnfs_common::{MemoryBlockStore, CODEC_RAW};
+    use wnfs_common::{CODEC_RAW, MemoryBlockStore};
 
     #[allow(clippy::unreachable, unused)]
     fn test_assert_send() {

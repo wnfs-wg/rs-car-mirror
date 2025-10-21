@@ -1,8 +1,8 @@
 use crate::common::references;
 use futures::Future;
 use wnfs_common::{
+    BlockStore, BlockStoreError, CODEC_RAW, Cid,
     utils::{CondSend, CondSync},
-    BlockStore, BlockStoreError, Cid, CODEC_RAW,
 };
 
 /// This trait abstracts caches used by the car mirror implementation.
@@ -109,10 +109,10 @@ pub use quick_cache::*;
 mod quick_cache {
     use super::Cache;
     use bytes::Bytes;
-    use quick_cache::{sync, OptionsBuilder, Weighter};
+    use quick_cache::{OptionsBuilder, Weighter, sync};
     use wnfs_common::{
-        utils::{Arc, CondSend},
         BlockStore, BlockStoreError, Cid,
+        utils::{Arc, CondSend},
     };
 
     /// A [quick-cache]-based implementation of a car mirror cache.
@@ -265,7 +265,7 @@ mod quick_cache {
         use super::{Cache, InMemoryCache};
         use ipld_core::ipld::Ipld;
         use testresult::TestResult;
-        use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_DAG_CBOR, CODEC_RAW};
+        use wnfs_common::{BlockStore, CODEC_DAG_CBOR, CODEC_RAW, MemoryBlockStore};
 
         #[test_log::test(async_std::test)]
         async fn test_references_cache() -> TestResult {
@@ -312,7 +312,7 @@ mod tests {
     use std::{collections::HashMap, sync::RwLock};
     use testresult::TestResult;
     use wnfs_common::{
-        BlockStore, BlockStoreError, Cid, MemoryBlockStore, CODEC_DAG_CBOR, CODEC_RAW,
+        BlockStore, BlockStoreError, CODEC_DAG_CBOR, CODEC_RAW, Cid, MemoryBlockStore,
     };
 
     #[derive(Debug, Default)]

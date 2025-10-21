@@ -1,13 +1,13 @@
 use crate::{
     cache::Cache,
     common::{
-        block_receive, block_receive_car_stream, block_send, block_send_block_stream,
-        stream_car_frames, CarFile, CarStream, Config, ReceiverState,
+        CarFile, CarStream, Config, ReceiverState, block_receive, block_receive_car_stream,
+        block_send, block_send_block_stream, stream_car_frames,
     },
     error::Error,
     messages::PushResponse,
 };
-use wnfs_common::{utils::CondSend, BlockStore, Cid};
+use wnfs_common::{BlockStore, Cid, utils::CondSend};
 
 /// Create a CAR mirror push request.
 ///
@@ -95,8 +95,8 @@ mod tests {
         dag_walk::DagWalk,
         push,
         test_utils::{
-            get_cid_at_approx_path, setup_random_dag, store_test_unixfs, total_dag_blocks,
-            total_dag_bytes, Metrics, Rvg,
+            Metrics, Rvg, get_cid_at_approx_path, setup_random_dag, store_test_unixfs,
+            total_dag_blocks, total_dag_bytes,
         },
     };
     use anyhow::Result;
