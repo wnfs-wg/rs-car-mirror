@@ -1,6 +1,6 @@
 use js_sys::Error;
-use libipld::Cid;
 use wasm_bindgen::JsValue;
+use wnfs_common::Cid;
 
 pub(crate) fn parse_cid(bytes: Vec<u8>) -> Result<Cid, Error> {
     Cid::read_bytes(&bytes[..]).map_err(|e| Error::new(&format!("Couldn't parse CID: {e:?}")))

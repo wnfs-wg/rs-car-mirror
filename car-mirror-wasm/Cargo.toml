@@ -7,8 +7,8 @@ categories = []
 include = ["/src", "/README.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
 license = "Apache-2.0"
 readme = "README.md"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 documentation = "https://docs.rs/car-mirror-wasm"
 repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror-wasm"
 authors = ["Philipp Krüger <philipp@fission.codes>"]
@@ -25,10 +25,10 @@ car-mirror = { path = "../car-mirror", version = "0.1" }
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
-console_error_panic_hook = { version = "0.1" }
+console_error_panic_hook = { version = "0.1", optional = true }
 futures = { workspace = true }
+ipld-core = { workspace = true }
 js-sys = { version = "0.3" }
-libipld = { workspace = true }
 serde-wasm-bindgen = "0.6.5"
 serde_json = { workspace = true }
 tokio-util = { workspace = true, features = ["compat", "io"] }

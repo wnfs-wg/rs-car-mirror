@@ -1,9 +1,8 @@
 use crate::{cache::Cache, common::references, error::Error};
 use bytes::Bytes;
-use futures::{stream::try_unfold, Stream};
-use libipld_core::cid::Cid;
+use futures::{Stream, stream::try_unfold};
 use std::collections::{HashSet, VecDeque};
-use wnfs_common::{BlockStore, BlockStoreError};
+use wnfs_common::{BlockStore, BlockStoreError, Cid};
 
 /// A struct that represents an ongoing walk through the Dag.
 #[derive(Clone, Debug)]
@@ -197,9 +196,9 @@ mod tests {
     use super::*;
     use crate::cache::NoCache;
     use futures::TryStreamExt;
-    use libipld::{cbor::DagCborCodec, Ipld};
+    use ipld_core::ipld::Ipld;
     use testresult::TestResult;
-    use wnfs_common::{encode, MemoryBlockStore};
+    use wnfs_common::{CODEC_DAG_CBOR, MemoryBlockStore};
 
     #[test_log::test(async_std::test)]
     async fn test_walk_dag_breadth_first() -> TestResult {
@@ -211,41 +210,38 @@ mod tests {
 
         let cid_1 = store
             .put_block(
-                encode(&Ipld::String("1".into()), DagCborCodec)?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::String("1".into()))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
         let cid_2 = store
             .put_block(
-                encode(&Ipld::String("2".into()), DagCborCodec)?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::String("2".into()))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
         let cid_3 = store
             .put_block(
-                encode(&Ipld::String("3".into()), DagCborCodec)?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::String("3".into()))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
 
         let cid_1_wrap = store
             .put_block(
-                encode(&Ipld::List(vec![Ipld::Link(cid_1)]), DagCborCodec)?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::List(vec![Ipld::Link(cid_1)]))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
 
         let cid_root = store
             .put_block(
-                encode(
-                    &Ipld::List(vec![
-                        Ipld::Link(cid_1_wrap),
-                        Ipld::Link(cid_2),
-                        Ipld::Link(cid_3),
-                    ]),
-                    DagCborCodec,
-                )?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::List(vec![
+                    Ipld::Link(cid_1_wrap),
+                    Ipld::Link(cid_2),
+                    Ipld::Link(cid_3),
+                ]))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
 
@@ -266,26 +262,19 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::{cache::NoCache, test_utils::arb_ipld_dag};
-    use futures::TryStreamExt;
-    use libipld::{
-        multihash::{Code, MultihashDigest},
-        Ipld, IpldCodec,
+    use crate::{
+        cache::NoCache,
+        test_utils::{arb_ipld_dag, links_to_ipld},
     };
+    use futures::TryStreamExt;
+    use ipld_core::ipld::Ipld;
     use proptest::strategy::Strategy;
     use std::collections::BTreeSet;
     use test_strategy::proptest;
-    use wnfs_common::{encode, MemoryBlockStore};
+    use wnfs_common::{CODEC_DAG_CBOR, MemoryBlockStore};
 
     fn ipld_dags() -> impl Strategy<Value = (Vec<(Cid, Ipld)>, Cid)> {
-        arb_ipld_dag(1..256, 0.5, |cids, _| {
-            let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
-            let cid = Cid::new_v1(
-                IpldCodec::DagCbor.into(),
-                Code::Blake3_256.digest(&encode(&ipld, IpldCodec::DagCbor).unwrap()),
-            );
-            (cid, ipld)
-        })
+        arb_ipld_dag(1..256, 0.5, |cids, _| links_to_ipld(cids))
     }
 
     #[proptest(max_shrink_iters = 100_000)]
@@ -295,11 +284,8 @@ mod proptests {
             let store = &MemoryBlockStore::new();
 
             for (cid, ipld) in dag.iter() {
-                let block: Bytes = encode(ipld, IpldCodec::DagCbor).unwrap().into();
-                let cid_store = store
-                    .put_block(block, IpldCodec::DagCbor.into())
-                    .await
-                    .unwrap();
+                let block: Bytes = serde_ipld_dagcbor::to_vec(&ipld).unwrap().into();
+                let cid_store = store.put_block(block, CODEC_DAG_CBOR).await.unwrap();
                 assert_eq!(*cid, cid_store);
             }
 

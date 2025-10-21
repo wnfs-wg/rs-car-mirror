@@ -1,18 +1,17 @@
 use bytes::Bytes;
-use libipld::{Cid, Ipld, IpldCodec};
-use libipld_core::multihash::{Code, MultihashDigest};
+use ipld_core::{cid::multihash::Multihash, ipld::Ipld};
 use proptest::{
     prelude::{Rng, RngCore},
     strategy::Strategy,
     test_runner::TestRng,
 };
-use roaring_graphs::{arb_dag, DirectedAcyclicGraph, Vertex};
+use roaring_graphs::{DirectedAcyclicGraph, Vertex, arb_dag};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     ops::Range,
 };
-use wnfs_common::encode;
+use wnfs_common::{CODEC_DAG_CBOR, CODEC_RAW, Cid, MULTIHASH_BLAKE3};
 
 /// A strategy for use with proptest to generate random DAGs (directed acyclic graphs).
 /// The strategy generates a list of blocks of type T and their CIDs, as well as
@@ -27,19 +26,21 @@ pub fn arb_ipld_dag<T: Debug + Clone>(
 }
 
 /// A block-generating function for use with `arb_ipld_dag`.
-pub fn links_to_ipld(cids: Vec<Cid>, _: &mut TestRng) -> (Cid, Ipld) {
+pub fn links_to_ipld(cids: Vec<Cid>) -> (Cid, Ipld) {
     let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
-    let bytes = encode(&ipld, IpldCodec::DagCbor).unwrap();
-    let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
+    let bytes = serde_ipld_dagcbor::to_vec(&ipld).unwrap();
+    let hash = Multihash::wrap(MULTIHASH_BLAKE3, blake3::hash(&bytes).as_bytes()).unwrap();
+    let cid = Cid::new_v1(serde_ipld_dagcbor::DAG_CBOR_CODE, hash);
     (cid, ipld)
 }
 
 /// A block-generating function for use with `arb_ipld_dag`.
-pub fn links_to_dag_cbor(cids: Vec<Cid>, _: &mut TestRng) -> (Cid, Bytes) {
+pub fn links_to_dag_cbor(cids: Vec<Cid>) -> (Cid, Bytes) {
     let ipld = Ipld::List(cids.into_iter().map(Ipld::Link).collect());
-    let bytes: Bytes = encode(&ipld, IpldCodec::DagCbor).unwrap().into();
-    let cid = Cid::new_v1(IpldCodec::DagCbor.into(), Code::Blake3_256.digest(&bytes));
-    (cid, bytes)
+    let bytes = serde_ipld_dagcbor::to_vec(&ipld).unwrap();
+    let hash = Multihash::wrap(MULTIHASH_BLAKE3, blake3::hash(&bytes).as_bytes()).unwrap();
+    let cid = Cid::new_v1(serde_ipld_dagcbor::DAG_CBOR_CODE, hash);
+    (cid, bytes.into())
 }
 
 /// A block-generating function for use with `arb_ipld_dag`.
@@ -53,25 +54,25 @@ pub fn links_to_padded_ipld(
         let mut padding = vec![0u8; padding_bytes];
         rng.fill_bytes(&mut padding);
 
-        let codec = match rng.gen_bool(0.5) {
-            true if cids.is_empty() => IpldCodec::Raw,
-            _ => IpldCodec::DagCbor,
-        };
-
-        let ipld = if cids.is_empty() && codec == IpldCodec::Raw {
-            Ipld::Bytes(padding)
+        let (codec, bytes, ipld) = if rng.gen_bool(0.5) && cids.is_empty() {
+            (CODEC_RAW, padding.clone(), Ipld::Bytes(padding))
         } else {
-            Ipld::Map(BTreeMap::from([
+            let ipld = Ipld::Map(BTreeMap::from([
                 ("data".into(), Ipld::Bytes(padding)),
                 (
                     "links".into(),
                     Ipld::List(cids.into_iter().map(Ipld::Link).collect()),
                 ),
-            ]))
+            ]));
+            (
+                CODEC_DAG_CBOR,
+                serde_ipld_dagcbor::to_vec(&ipld).unwrap(),
+                ipld,
+            )
         };
 
-        let bytes = encode(&ipld, codec).unwrap();
-        let cid = Cid::new_v1(codec.into(), Code::Blake3_256.digest(&bytes));
+        let hash = Multihash::wrap(MULTIHASH_BLAKE3, blake3::hash(&bytes).as_bytes()).unwrap();
+        let cid = Cid::new_v1(codec, hash);
         (cid, ipld)
     }
 }

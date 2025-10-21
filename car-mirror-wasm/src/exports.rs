@@ -9,7 +9,7 @@ use futures::{StreamExt, TryStreamExt};
 use js_sys::{Error, Promise, Uint8Array};
 use std::rc::Rc;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
+use wasm_bindgen::{JsValue, prelude::wasm_bindgen};
 use wasm_bindgen_futures::future_to_promise;
 use wasm_streams::ReadableStream;
 

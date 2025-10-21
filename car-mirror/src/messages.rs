@@ -1,8 +1,8 @@
 use std::{collections::TryReserveError, convert::Infallible};
 
-use libipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use serde_ipld_dagcbor::{DecodeError, EncodeError};
+use wnfs_common::Cid;
 
 /// Initial message for pull requests.
 ///

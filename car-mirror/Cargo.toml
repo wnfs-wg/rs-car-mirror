@@ -7,8 +7,8 @@ categories = []
 include = ["/src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "Apache-2.0"
 readme = "README.md"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 documentation = "https://docs.rs/car-mirror"
 repository = "https://github.com/fission-codes/rs-car-mirror/tree/main/car-mirror"
 authors = ["Philipp Krüger <philipp@fission.codes>"]
@@ -20,19 +20,22 @@ doctest = true
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
+blake3 = { version = "1.8.2", optional = true }
 bytes = { workspace = true }
 data-encoding = "2.5.0"
 deterministic-bloom = "0.1"
 futures = { workspace = true }
-iroh-car = "0.4"
-libipld = { workspace = true }
-libipld-core = { workspace = true }
+ipld-core = { workspace = true }
+ipld-dagpb = "0.2"
+iroh-car = "0.5.1"
+multihash_old = { package = "multihash", version = "0.18" }
 proptest = { version = "1.1", optional = true }
 quick_cache = { version = "0.4", optional = true }
 roaring-graphs = { version = "0.12", optional = true }
 serde = "^1"
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true, optional = true }
 thiserror = "1.0"
 tokio = { version = "^1", default-features = false }
 tracing = "0.1"
@@ -54,7 +57,7 @@ wnfs-unixfs-file = { version = "0.2.0" }
 
 [features]
 default = []
-test_utils = ["proptest", "roaring-graphs"]
+test_utils = ["proptest", "roaring-graphs", "dep:serde_json", "dep:blake3"]
 quick_cache = ["dep:quick_cache"]
 
 [package.metadata.docs.rs]
