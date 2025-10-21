@@ -24,7 +24,7 @@ jobs:
           - 1.75
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       # Smarter caching action, speeds up build times compared to regular cache:
       # https://github.com/Swatinem/rust-cache
@@ -91,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Cache Project
         uses: Swatinem/rust-cache@v2
@@ -114,7 +114,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@v1.6.3
