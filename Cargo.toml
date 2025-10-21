@@ -12,10 +12,9 @@ anyhow = "1.0"
 async-stream = "0.3.5"
 bytes = "1.4"
 futures = "0.3"
-libipld = "0.16"
-libipld-core = "0.16"
-serde_ipld_dagcbor = "0.4"
+ipld-core = { version = "0.4" }
 serde_bytes = "0.11"
+serde_ipld_dagcbor = "0.6"
 serde_json = "1.0"
 tokio-util = "0.7.8"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
@@ -41,3 +40,7 @@ opt-level = "s" # or 'z' to optimize "aggressively" for size
 [profile.dev]
 split-debuginfo = "unpacked"
 opt-level = 3
+
+[patch.crates-io]
+wnfs-common = { git = "https://github.com/wnfs-wg/rs-wnfs.git", branch = "matheus23/updates" }
+wnfs-unixfs-file = { git = "https://github.com/wnfs-wg/rs-wnfs.git", branch = "matheus23/updates" }

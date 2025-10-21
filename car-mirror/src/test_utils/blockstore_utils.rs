@@ -1,9 +1,7 @@
-use crate::common::references;
 use anyhow::Result;
-use bytes::Bytes;
-use libipld::{Cid, Ipld, IpldCodec};
+use ipld_core::ipld::Ipld;
 use std::io::Write;
-use wnfs_common::{encode, BlockStore, MemoryBlockStore};
+use wnfs_common::{BlockStore, Cid, MemoryBlockStore, CODEC_DAG_CBOR, CODEC_DAG_JSON, CODEC_RAW};
 
 /// Take a list of dag-cbor IPLD blocks and store all of them as dag-cbor in a
 /// MemoryBlockStore & return it.
@@ -20,9 +18,20 @@ pub async fn setup_existing_blockstore(
     store: &impl BlockStore,
 ) -> Result<()> {
     for (cid, ipld) in blocks.into_iter() {
-        let codec: IpldCodec = cid.codec().try_into()?;
-        let block: Bytes = encode(&ipld, codec)?.into();
-        let cid_store = store.put_block(block, codec.into()).await?;
+        let block: Vec<u8> = match cid.codec() {
+            CODEC_DAG_CBOR => serde_ipld_dagcbor::to_vec(&ipld)?,
+            CODEC_DAG_JSON => serde_json::to_vec(&ipld)?,
+            CODEC_RAW => {
+                let Ipld::Bytes(bytes) = ipld else {
+                    anyhow::bail!("raw codec block that's not bytes");
+                };
+                bytes
+            }
+            other => {
+                anyhow::bail!("Unsupported codec {other}")
+            }
+        };
+        let cid_store = store.put_block(block, cid.codec()).await?;
         debug_assert_eq!(cid, cid_store);
     }
 
@@ -37,9 +46,8 @@ pub fn dag_to_dot(
     writeln!(writer, "digraph {{")?;
 
     for (cid, ipld) in blocks {
-        let codec: IpldCodec = cid.codec().try_into()?;
-        let bytes = encode(&ipld, codec)?;
-        let refs = references(cid, bytes, Vec::new())?;
+        let mut refs = Vec::new();
+        ipld.references(&mut refs);
         for to_cid in refs {
             print_truncated_string(writer, cid.to_string())?;
             write!(writer, " -> ")?;

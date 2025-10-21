@@ -3,9 +3,9 @@ use super::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore, Rvg};
 use crate::{cache::NoCache, common::references, dag_walk::DagWalk, error::Error};
 use anyhow::Result;
 use futures::TryStreamExt;
-use libipld::{Cid, Ipld};
+use ipld_core::ipld::Ipld;
 use proptest::strategy::Strategy;
-use wnfs_common::{utils::CondSend, BlockStore, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, Cid, MemoryBlockStore};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Metrics {

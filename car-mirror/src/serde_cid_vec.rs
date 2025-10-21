@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use libipld::Cid;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
+use wnfs_common::Cid;
 
 pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Cid>, D::Error>
 where

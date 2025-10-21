@@ -7,9 +7,8 @@ use car_mirror::{
     test_utils::{arb_ipld_dag, links_to_padded_ipld, setup_blockstore},
 };
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use libipld::Cid;
 use std::time::Duration;
-use wnfs_common::{utils::CondSend, BlockStore, BlockStoreError, MemoryBlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, BlockStoreError, Cid, MemoryBlockStore};
 
 pub fn push_throttled(c: &mut Criterion) {
     let mut rvg = car_mirror::test_utils::Rvg::deterministic();

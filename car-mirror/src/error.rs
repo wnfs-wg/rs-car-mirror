@@ -1,6 +1,5 @@
 use crate::incremental_verification::BlockState;
-use libipld::Cid;
-use wnfs_common::BlockStoreError;
+use wnfs_common::{BlockStoreError, Cid};
 
 /// Errors raised from the CAR mirror library
 #[derive(thiserror::Error, Debug)]

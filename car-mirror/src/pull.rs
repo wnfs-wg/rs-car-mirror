@@ -7,9 +7,8 @@ use crate::{
     error::Error,
     messages::PullRequest,
 };
-use libipld::Cid;
 use tokio::io::AsyncRead;
-use wnfs_common::{utils::CondSend, BlockStore};
+use wnfs_common::{utils::CondSend, BlockStore, Cid};
 
 /// Create a CAR mirror pull request.
 ///
@@ -88,11 +87,10 @@ mod tests {
     };
     use anyhow::Result;
     use futures::TryStreamExt;
-    use libipld::Cid;
     use std::collections::HashSet;
     use testresult::TestResult;
     use tokio_util::io::StreamReader;
-    use wnfs_common::{BlockStore, MemoryBlockStore};
+    use wnfs_common::{BlockStore, Cid, MemoryBlockStore};
 
     pub(crate) async fn simulate_protocol(
         root: Cid,
@@ -190,10 +188,10 @@ mod proptests {
         test_utils::{setup_blockstore, variable_blocksize_dag},
     };
     use futures::TryStreamExt;
-    use libipld::{Cid, Ipld};
+    use ipld_core::ipld::Ipld;
     use std::collections::HashSet;
     use test_strategy::proptest;
-    use wnfs_common::MemoryBlockStore;
+    use wnfs_common::{Cid, MemoryBlockStore};
 
     #[proptest]
     fn cold_transfer_completes(#[strategy(variable_blocksize_dag())] dag: (Vec<(Cid, Ipld)>, Cid)) {
