@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Run Audit-Check
         uses: rustsec/audit-check@v2.0.0
         with:
