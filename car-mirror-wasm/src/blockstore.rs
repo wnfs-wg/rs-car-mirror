@@ -3,10 +3,9 @@
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
 use js_sys::{Promise, Uint8Array};
-use libipld::cid::Cid;
 use wasm_bindgen::{JsCast, prelude::wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
-use wnfs_common::{BlockStore as WnfsBlockStore, BlockStoreError};
+use wnfs_common::{BlockStore as WnfsBlockStore, BlockStoreError, Cid};
 
 //--------------------------------------------------------------------------------------------------
 // Externs
