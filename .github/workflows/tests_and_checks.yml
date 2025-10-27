@@ -117,7 +117,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@v1.6.3
+        uses: cargo-bins/cargo-binstall@v1.15.9
 
       - name: Install wasm-bindgen
         run: cargo binstall wasm-bindgen-cli --version 0.2.91 -y
