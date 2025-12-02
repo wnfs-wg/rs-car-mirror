@@ -4,7 +4,7 @@ use car_mirror::{cache::NoCache, common::Config};
 use car_mirror_reqwest::RequestBuilderExt;
 use reqwest::Client;
 use testresult::TestResult;
-use wnfs_common::{BlockStore, MemoryBlockStore, CODEC_RAW};
+use wnfs_common::{BlockStore, CODEC_RAW, MemoryBlockStore};
 
 #[test_log::test(tokio::test)]
 async fn test_car_mirror_reqwest_axum_integration() -> TestResult {

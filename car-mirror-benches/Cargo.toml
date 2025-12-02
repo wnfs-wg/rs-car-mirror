@@ -2,7 +2,7 @@
 name = "car-mirror-benches"
 version = "0.1.0"
 publish = false
-edition = "2021"
+edition = "2024"
 authors = ["Philipp Krüger <philipp@fission.codes>"]
 
 [dependencies]
@@ -10,7 +10,7 @@ anyhow = { workspace = true }
 async-std = { version = "1.11", features = ["attributes"] }
 bytes = { workspace = true }
 car-mirror = { path = "../car-mirror", version = "0.1", features = ["test_utils", "quick_cache"] }
-libipld = { workspace = true }
+ipld-core = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 wnfs-common = { workspace = true }
 

@@ -21,7 +21,7 @@ jobs:
           - stable
           - nightly
           # minimum version
-          - 1.75
+          - 1.85
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -137,7 +137,7 @@ jobs:
       - name: Cache Project (JavaScript)
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1

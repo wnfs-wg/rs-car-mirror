@@ -8,13 +8,12 @@ use crate::{
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
 use futures::{StreamExt, TryStreamExt};
+use ipld_core::ipld::Ipld;
 use iroh_car::{CarHeader, CarReader, CarWriter};
-use libipld::{Ipld, IpldCodec};
-use libipld_core::{cid::Cid, codec::References};
 use std::io::Cursor;
 use wnfs_common::{
-    utils::{boxed_stream, BoxStream, CondSend},
-    BlockStore,
+    BlockStore, CODEC_DAG_CBOR, CODEC_DAG_PB, CODEC_RAW, Cid,
+    utils::{BoxStream, CondSend, boxed_stream},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -327,12 +326,15 @@ pub fn references<E: Extend<Cid>>(
     block: impl AsRef<[u8]>,
     mut refs: E,
 ) -> Result<E, anyhow::Error> {
-    let codec: IpldCodec = cid
-        .codec()
-        .try_into()
-        .map_err(|_| Error::UnsupportedCodec { cid })?;
+    match cid.codec() {
+        CODEC_DAG_CBOR => {
+            serde_ipld_dagcbor::from_slice::<Ipld>(block.as_ref())?.references(&mut refs)
+        }
+        CODEC_DAG_PB => ipld_dagpb::links(block.as_ref(), &mut refs)?,
+        CODEC_RAW => {} // no refs
+        _other => anyhow::bail!(Error::UnsupportedCodec { cid }),
+    };
 
-    <Ipld as References<IpldCodec>>::references(codec, &mut Cursor::new(block), &mut refs)?;
     Ok(refs)
 }
 
@@ -624,7 +626,7 @@ pub(crate) mod tests {
     use crate::{cache::NoCache, test_utils::assert_cond_send_sync};
     use assert_matches::assert_matches;
     use testresult::TestResult;
-    use wnfs_common::{MemoryBlockStore, CODEC_RAW};
+    use wnfs_common::{CODEC_RAW, MemoryBlockStore};
 
     #[allow(clippy::unreachable, unused)]
     fn test_assert_send() {

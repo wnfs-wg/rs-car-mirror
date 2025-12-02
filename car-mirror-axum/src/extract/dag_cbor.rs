@@ -2,15 +2,15 @@
 
 use anyhow::Result;
 use axum::{
-    extract::{rejection::BytesRejection, FromRequest, Request},
+    extract::{FromRequest, Request, rejection::BytesRejection},
     http::{
-        header::{ToStrError, CONTENT_TYPE},
         HeaderValue, StatusCode,
+        header::{CONTENT_TYPE, ToStrError},
     },
     response::{IntoResponse, Response},
 };
 use bytes::Bytes;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_ipld_dagcbor::DecodeError;
 use std::{convert::Infallible, fmt::Debug};
 
@@ -22,7 +22,9 @@ pub struct DagCbor<M>(pub M);
 #[derive(Debug, thiserror::Error)]
 pub enum DagCborRejection {
     /// When the Content-Type header is missing
-    #[error("Missing Content-Type header on request, expected application/vnd.ipld.dag-cbor, but got nothing")]
+    #[error(
+        "Missing Content-Type header on request, expected application/vnd.ipld.dag-cbor, but got nothing"
+    )]
     MissingContentType,
 
     /// When a Content-Type header was set, but unexpected.

@@ -1,9 +1,8 @@
 use crate::common::references;
 use futures::Future;
-use libipld::{Cid, IpldCodec};
 use wnfs_common::{
+    BlockStore, BlockStoreError, CODEC_RAW, Cid,
     utils::{CondSend, CondSync},
-    BlockStore, BlockStoreError,
 };
 
 /// This trait abstracts caches used by the car mirror implementation.
@@ -45,8 +44,7 @@ pub trait Cache: CondSync {
     ) -> impl Future<Output = Result<Vec<Cid>, BlockStoreError>> + CondSend {
         async move {
             // raw blocks don't have further links
-            let raw_codec: u64 = IpldCodec::Raw.into();
-            if cid.codec() == raw_codec {
+            if cid.codec() == CODEC_RAW {
                 return Ok(Vec::new());
             }
 
@@ -111,11 +109,10 @@ pub use quick_cache::*;
 mod quick_cache {
     use super::Cache;
     use bytes::Bytes;
-    use libipld::Cid;
-    use quick_cache::{sync, OptionsBuilder, Weighter};
+    use quick_cache::{OptionsBuilder, Weighter, sync};
     use wnfs_common::{
+        BlockStore, BlockStoreError, Cid,
         utils::{Arc, CondSend},
-        BlockStore, BlockStoreError,
     };
 
     /// A [quick-cache]-based implementation of a car mirror cache.
@@ -266,28 +263,24 @@ mod quick_cache {
     #[cfg(test)]
     mod tests {
         use super::{Cache, InMemoryCache};
-        use libipld::{cbor::DagCborCodec, Ipld, IpldCodec};
+        use ipld_core::ipld::Ipld;
         use testresult::TestResult;
-        use wnfs_common::{encode, BlockStore, MemoryBlockStore};
+        use wnfs_common::{BlockStore, CODEC_DAG_CBOR, CODEC_RAW, MemoryBlockStore};
 
         #[test_log::test(async_std::test)]
         async fn test_references_cache() -> TestResult {
             let store = &MemoryBlockStore::new();
             let cache = InMemoryCache::new(100_000);
 
-            let hello_one_cid = store
-                .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
-                .await?;
-            let hello_two_cid = store
-                .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
-                .await?;
+            let hello_one_cid = store.put_block(b"Hello, One?".to_vec(), CODEC_RAW).await?;
+            let hello_two_cid = store.put_block(b"Hello, Two?".to_vec(), CODEC_RAW).await?;
             let cid = store
                 .put_block(
-                    encode(
-                        &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
-                        DagCborCodec,
-                    )?,
-                    DagCborCodec.into(),
+                    serde_ipld_dagcbor::to_vec(&Ipld::List(vec![
+                        Ipld::Link(hello_one_cid),
+                        Ipld::Link(hello_two_cid),
+                    ]))?,
+                    CODEC_DAG_CBOR,
                 )
                 .await?;
 
@@ -315,10 +308,12 @@ mod quick_cache {
 mod tests {
     use super::{Cache, NoCache};
     use anyhow::Result;
-    use libipld::{cbor::DagCborCodec, Cid, Ipld, IpldCodec};
+    use ipld_core::ipld::Ipld;
     use std::{collections::HashMap, sync::RwLock};
     use testresult::TestResult;
-    use wnfs_common::{encode, BlockStore, BlockStoreError, MemoryBlockStore};
+    use wnfs_common::{
+        BlockStore, BlockStoreError, CODEC_DAG_CBOR, CODEC_RAW, Cid, MemoryBlockStore,
+    };
 
     #[derive(Debug, Default)]
     struct HashMapCache {
@@ -348,19 +343,15 @@ mod tests {
         let store = &MemoryBlockStore::new();
         let cache = HashMapCache::default();
 
-        let hello_one_cid = store
-            .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
-            .await?;
-        let hello_two_cid = store
-            .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
-            .await?;
+        let hello_one_cid = store.put_block(b"Hello, One?".to_vec(), CODEC_RAW).await?;
+        let hello_two_cid = store.put_block(b"Hello, Two?".to_vec(), CODEC_RAW).await?;
         let cid = store
             .put_block(
-                encode(
-                    &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
-                    DagCborCodec,
-                )?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::List(vec![
+                    Ipld::Link(hello_one_cid),
+                    Ipld::Link(hello_two_cid),
+                ]))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
 
@@ -387,19 +378,15 @@ mod tests {
         let store = &MemoryBlockStore::new();
         let cache = NoCache;
 
-        let hello_one_cid = store
-            .put_block(b"Hello, One?".to_vec(), IpldCodec::Raw.into())
-            .await?;
-        let hello_two_cid = store
-            .put_block(b"Hello, Two?".to_vec(), IpldCodec::Raw.into())
-            .await?;
+        let hello_one_cid = store.put_block(b"Hello, One?".to_vec(), CODEC_RAW).await?;
+        let hello_two_cid = store.put_block(b"Hello, Two?".to_vec(), CODEC_RAW).await?;
         let cid = store
             .put_block(
-                encode(
-                    &Ipld::List(vec![Ipld::Link(hello_one_cid), Ipld::Link(hello_two_cid)]),
-                    DagCborCodec,
-                )?,
-                DagCborCodec.into(),
+                serde_ipld_dagcbor::to_vec(&Ipld::List(vec![
+                    Ipld::Link(hello_one_cid),
+                    Ipld::Link(hello_two_cid),
+                ]))?,
+                CODEC_DAG_CBOR,
             )
             .await?;
 

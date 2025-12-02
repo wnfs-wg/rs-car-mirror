@@ -96,14 +96,14 @@ impl From<&wnfs_common::BlockStoreError> for AppError {
     }
 }
 
-impl From<libipld::cid::Error> for AppError {
-    fn from(err: libipld::cid::Error) -> Self {
+impl From<ipld_core::cid::Error> for AppError {
+    fn from(err: ipld_core::cid::Error) -> Self {
         Self::from(&err)
     }
 }
 
-impl From<&libipld::cid::Error> for AppError {
-    fn from(err: &libipld::cid::Error) -> Self {
+impl From<&ipld_core::cid::Error> for AppError {
+    fn from(err: &ipld_core::cid::Error) -> Self {
         Self::new(StatusCode::BAD_REQUEST, err)
     }
 }

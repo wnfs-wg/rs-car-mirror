@@ -6,12 +6,9 @@ use crate::{
 };
 use bytes::Bytes;
 use deterministic_bloom::runtime_size::BloomFilter;
-use libipld_core::{
-    cid::Cid,
-    multihash::{Code, MultihashDigest},
-};
+use ipld_core::cid::multihash::Multihash;
 use std::{collections::HashSet, matches};
-use wnfs_common::BlockStore;
+use wnfs_common::{BlockStore, Cid};
 
 /// A data structure that keeps state about incremental DAG verification.
 #[derive(Clone, Debug)]
@@ -141,16 +138,23 @@ impl IncrementalDagVerification {
             .into());
         }
 
-        let hash_func: Code = cid
+        // TODO(matheus23): This supports all hash types of multihash version 0.18.
+        // Ideally, we support only selected hash types by feature flag or implement
+        // this in some other way.
+        let hash_func: multihash_old::Code = cid
             .hash()
             .code()
             .try_into()
             .map_err(|_| Error::UnsupportedHashCode { cid })?;
 
-        let hash = hash_func.digest(bytes.as_ref());
+        let hash = multihash_old::MultihashDigest::digest(&hash_func, bytes.as_ref());
 
-        if &hash != cid.hash() {
-            let actual_cid = Cid::new_v1(cid.codec(), hash);
+        if hash.digest() != cid.hash().digest() {
+            let actual_cid = Cid::new_v1(
+                cid.codec(),
+                Multihash::wrap(cid.hash().code(), hash.digest())
+                    .expect("hardcoded digest size incorrect"),
+            );
             return Err(IncrementalVerificationError::DigestMismatch {
                 cid: Box::new(cid),
                 actual_cid: Box::new(actual_cid),

@@ -2,11 +2,10 @@ use crate::Error;
 use anyhow::Result;
 use car_mirror::{cache::Cache, common::Config, messages::PushResponse};
 use futures::{Future, TryStreamExt};
-use libipld::Cid;
 use reqwest::{Body, Response, StatusCode};
 use std::{collections::TryReserveError, convert::Infallible};
 use tokio_util::io::StreamReader;
-use wnfs_common::BlockStore;
+use wnfs_common::{BlockStore, Cid};
 
 /// Extension methods on `RequestBuilder`s for sending car mirror protocol requests.
 pub trait RequestBuilderExt {
@@ -130,13 +129,15 @@ async fn send_reqwest(
     builder: &reqwest::RequestBuilder,
     body: reqwest::Body,
 ) -> Result<Response, Error> {
-    Ok(builder
+    let (client, request) = builder
         .try_clone()
         .ok_or(Error::RequestBuilderBodyAlreadySet)?
         .header("Content-Type", "application/vnd.ipld.dag-cbor")
         .body(body)
-        .send()
-        .await?)
+        .build_split();
+    let request = request?;
+    println!("HEADERS: {:#?}", request.headers());
+    Ok(client.execute(request).await?)
 }
 
 /// Run (possibly multiple rounds of) the car mirror push protocol.
